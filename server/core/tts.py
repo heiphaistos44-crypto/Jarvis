@@ -3,6 +3,7 @@ import asyncio
 import subprocess
 import base64
 import tempfile
+import time
 import re as _re
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,10 +24,13 @@ class TTSManager:
     (local). Si la voix active est Edge et que le réseau échoue, bascule
     automatiquement sur Piper — JARVIS ne devient jamais muet."""
 
+    _EDGE_COOLDOWN_S = 60.0  # après un échec, rester sur Piper (voix cohérente)
+
     def __init__(self, settings: "Settings") -> None:
         self._piper_exe = settings.piper_exe
         self._voice = settings.piper_voice
         self._edge_voice: str | None = None
+        self._edge_down_until: float = 0.0
         self._piper_ok = self._piper_exe.exists() and self._voice.exists()
         if not self._piper_ok:
             logger.warning(
@@ -71,15 +75,24 @@ class TTSManager:
 
         text = text[:MAX_TTS_CHARS]
 
-        if self._edge_voice is not None:
-            try:
-                audio = await asyncio.wait_for(self._synthesize_edge(text), timeout=15)
-                logger.debug(f"TTS Edge OK: {len(text)} chars")
-                return audio
-            except Exception as e:
-                logger.warning(f"Edge-TTS indisponible ({e}) — repli sur Piper")
-                if not self._piper_ok:
-                    return None
+        if self._edge_voice is not None and time.monotonic() >= self._edge_down_until:
+            # 2 tentatives : Microsoft coupe parfois les connexions en rafale
+            # (une par phrase) — un retry absorbe la quasi-totalité des échecs.
+            for attempt in (1, 2):
+                try:
+                    audio = await asyncio.wait_for(self._synthesize_edge(text), timeout=10)
+                    logger.debug(f"TTS Edge OK: {len(text)} chars")
+                    return audio
+                except Exception as e:
+                    if attempt == 1:
+                        await asyncio.sleep(0.4)
+                        continue
+                    # Cooldown : voix Piper cohérente pendant 60 s plutôt
+                    # qu'une alternance Henri/Piper phrase par phrase.
+                    self._edge_down_until = time.monotonic() + self._EDGE_COOLDOWN_S
+                    logger.warning(f"Edge-TTS en panne ({e}) — Piper pendant 60 s")
+            if not self._piper_ok:
+                return None
 
         def _run() -> bytes:
             tmp_path: Path | None = None
