@@ -6,8 +6,10 @@ import uuid
 from fastapi import WebSocket, WebSocketDisconnect
 from utils.logger import get_logger
 from utils.config import MODELS_DIR
-from core.llm import LLMManager, parse_tool_call, _TOOL_CALL_RE
+from core.llm import parse_tool_call, _TOOL_CALL_RE
 from core.memory import ContextMemory
+from core.prompt import build_system_prompt
+from core.providers import ProviderManager
 from core.stt import STTManager
 from core.tts import TTSManager
 from tools.registry import ToolRegistry
@@ -36,23 +38,43 @@ MAX_AGENT_ITERATIONS = 5
 
 async def _agent_loop(
     ws: "WebSocket",
-    llm: "LLMManager",
+    providers: "ProviderManager",
     tts: "TTSManager",
     tools: "ToolRegistry",
     messages: list[dict],
     tts_enabled: bool,
     message_id: str,
     tts_queue: "asyncio.Queue[str]",
+    system: str,
 ) -> str:
     """Boucle agent : LLM → tool → LLM → ... → réponse finale (max 5 itérations)."""
     accumulated = ""
+    max_tokens = 512 if providers.tier == "local" else 1024
+    used_tools = False
+    lesson_recorded = False
+    user_query = next(
+        (m["content"][:200] for m in reversed(messages) if m["role"] == "user"), ""
+    )
+
+    async def _notify_fallback(label: str) -> None:
+        await manager.send(ws, "notice", {
+            "message": f"{label} indisponible — bascule sur le cerveau local.",
+        })
 
     for _iteration in range(MAX_AGENT_ITERATIONS):
         full_response = ""
         sentence_buf = ""
         in_tool_tag = False
 
-        async for token in llm.stream(messages):
+        await manager.send(ws, "agent_step", {
+            "phase": "thinking",
+            "detail": f"Itération {_iteration + 1}",
+            "messageId": message_id,
+        })
+
+        async for token in providers.stream(
+            system, messages, max_tokens=max_tokens, on_fallback=_notify_fallback,
+        ):
             full_response += token
             # Détecter début de balise tool → bufferiser sans envoyer
             if "<JARVIS_TOOL>" in full_response and "</JARVIS_TOOL>" not in full_response:
@@ -84,6 +106,9 @@ async def _agent_loop(
             name, args = tool_result
             logger.info(f"Agent loop iteration {_iteration + 1}: tool call {name}({args})")
             # Notifier le client (outil en cours)
+            await manager.send(ws, "agent_step", {
+                "phase": "tool", "detail": name, "messageId": message_id,
+            })
             await manager.send(ws, "tool_result", {"tool": name, "result": f"⚙️ Exécution de {name}..."})
             # Exécuter l'outil dans un thread (opération bloquante possible)
             try:
@@ -94,6 +119,19 @@ async def _agent_loop(
 
             # Envoyer le résultat au client
             await manager.send(ws, "tool_result", {"tool": name, "result": str(result)[:300]})
+            used_tools = True
+
+            # Leçon apprise : un échec d'outil est mémorisé pour ne pas être répété
+            if not lesson_recorded and str(result).lower().startswith("erreur"):
+                lesson_recorded = True
+                try:
+                    from core.persistent_memory import get_memory
+                    get_memory().record_lesson(
+                        context=user_query,
+                        lesson=f"L'outil {name}({args}) a échoué : {str(result)[:120]}",
+                    )
+                except Exception:
+                    logger.warning("Impossible d'enregistrer la leçon", exc_info=True)
 
             # Extraire le texte visible avant la balise tool (s'il y en a)
             visible = _TOOL_CALL_RE.sub("", full_response).strip()
@@ -129,7 +167,56 @@ async def _agent_loop(
 
             break  # Réponse finale → sortir de la boucle
 
+    # ── Passe de vérification (cloud + outils utilisés uniquement) ──────────
+    if used_tools and providers.tier == "cloud" and accumulated.strip():
+        correction = await _verify_pass(ws, providers, system, messages, accumulated, message_id)
+        if correction:
+            await manager.send(ws, "token", {"token": f"\n{correction}", "messageId": message_id})
+            accumulated += f"\n{correction}"
+            if tts_enabled:
+                await tts_queue.put(correction)
+
     return accumulated
+
+
+async def _verify_pass(
+    ws: "WebSocket",
+    providers: "ProviderManager",
+    system: str,
+    messages: list[dict],
+    response: str,
+    message_id: str,
+) -> str:
+    """Relecture courte de la réponse (discipline verification). Retourne la
+    correction à annoncer, ou '' si la réponse est validée."""
+    await manager.send(ws, "agent_step", {
+        "phase": "verify", "detail": "Relecture de la réponse", "messageId": message_id,
+    })
+    verify_messages = messages + [
+        {"role": "assistant", "content": response},
+        {
+            "role": "user",
+            "content": (
+                "Vérifie ta réponse ci-dessus : répond-elle exactement à la demande "
+                "initiale, sans erreur factuelle par rapport aux résultats d'outils ? "
+                "Si oui, réponds exactement OK. Sinon, donne uniquement la correction "
+                "en une ou deux phrases."
+            ),
+        },
+    ]
+    try:
+        chunks = [
+            token
+            async for token in providers.stream(system, verify_messages, max_tokens=200)
+        ]
+    except Exception as e:
+        logger.warning(f"Passe de vérification échouée: {e}")
+        return ""
+    verdict = "".join(chunks).strip()
+    if not verdict or verdict.upper().startswith("OK"):
+        return ""
+    logger.info(f"Vérification: correction émise ({verdict[:80]})")
+    return verdict
 
 
 class ConnectionManager:
@@ -182,57 +269,10 @@ async def _tts_sentence_worker(
             pass  # WebSocket déjà fermé — normal à la déconnexion
 
 
-async def _stream_llm_with_tts(
-    ws: WebSocket,
-    llm: LLMManager,
-    memory: ContextMemory,
-    tts: TTSManager,
-    tts_enabled: bool,
-    message_id: str,
-    max_tokens: int = 256,
-) -> str:
-    """Stream LLM tokens vers le client et lance TTS concurrent par phrase.
-
-    Retourne la réponse complète. Garantit le nettoyage du tts_task même en cas
-    d'exception via try/finally.
-    """
-    tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
-    tts_task = None
-    if tts_enabled and tts.is_available:
-        tts_task = asyncio.create_task(_tts_sentence_worker(tts_queue, ws, tts))
-
-    full_response = ""
-    sentence_buf = ""
-
-    try:
-        async for token in llm.stream(memory.get_messages(), max_tokens=max_tokens):
-            full_response += token
-            if "<JARVIS_TOOL>" not in full_response:
-                await manager.send(ws, "token", {"token": token, "messageId": message_id})
-
-            if tts_task and "<JARVIS_TOOL>" not in full_response:
-                sentence_buf += token
-                m = _SENTENCE_BOUNDARY.search(sentence_buf)
-                if m:
-                    phrase = sentence_buf[: m.start() + 1].strip()
-                    sentence_buf = sentence_buf[m.end():]
-                    if phrase:
-                        await tts_queue.put(phrase)
-    finally:
-        if tts_task:
-            # Flush le buffer restant puis signal de fin — garanti même si exception
-            if sentence_buf.strip() and "<JARVIS_TOOL>" not in sentence_buf:
-                await tts_queue.put(sentence_buf.strip())
-            await tts_queue.put(None)
-            await tts_task
-
-    return full_response
-
-
 async def handle_text_query(
     ws: WebSocket,
     text: str,
-    llm: LLMManager,
+    providers: ProviderManager,
     memory: ContextMemory,
     tts: TTSManager,
     tools: ToolRegistry,
@@ -241,6 +281,7 @@ async def handle_text_query(
     await manager.send(ws, "status", {"status": "processing"})
     memory.add_user(text)
     message_id = str(uuid.uuid4())
+    system = build_system_prompt(providers.tier, text)
 
     # ── Agent loop (multi-tool, max MAX_AGENT_ITERATIONS) ──────────────────
     tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -251,13 +292,14 @@ async def handle_text_query(
     try:
         final_text = await _agent_loop(
             ws=ws,
-            llm=llm,
+            providers=providers,
             tts=tts,
             tools=tools,
             messages=memory.get_messages(),
             tts_enabled=tts_enabled and tts.is_available,
             message_id=message_id,
             tts_queue=tts_queue,
+            system=system,
         )
     finally:
         if tts_task:
@@ -267,6 +309,7 @@ async def handle_text_query(
     if final_text:
         memory.add_assistant(final_text)
 
+    await manager.send(ws, "agent_step", {"phase": "done", "detail": "", "messageId": message_id})
     await manager.send(ws, "message_done", {"messageId": message_id})
     await manager.send(ws, "status", {"status": "idle"})
 
@@ -276,7 +319,7 @@ async def transcribe_and_query(
     audio_buffer: list[list[float]],
     sample_rate: int,
     stt: STTManager,
-    llm: LLMManager,
+    providers: ProviderManager,
     memory: ContextMemory,
     tts: TTSManager,
     tools: ToolRegistry,
@@ -288,12 +331,12 @@ async def transcribe_and_query(
     logger.info(f"STT transcription: '{text}'")
     if text.strip():
         await manager.send(ws, "stt_text", {"text": text.strip()})
-        await handle_text_query(ws, text.strip(), llm, memory, tts, tools, tts_enabled)
+        await handle_text_query(ws, text.strip(), providers, memory, tts, tools, tts_enabled)
 
 
 async def websocket_handler(
     ws: WebSocket,
-    llm: LLMManager,
+    providers: ProviderManager,
     stt: STTManager,
     tts: TTSManager,
     tools: ToolRegistry,
@@ -326,9 +369,12 @@ async def websocket_handler(
 
     # Notify client of server capabilities immediately on connect
     await manager.send(ws, "server_status", {
-        "llm": llm.is_available,
+        "llm": providers.is_available,
         "stt": stt.is_available,
         "tts": tts.is_available,
+        "provider": providers.active.name,
+        "providerLabel": providers.active.label,
+        "providerModel": providers.active.model,
     })
 
     # Per-connection memory — no shared state between clients
@@ -358,7 +404,7 @@ async def websocket_handler(
                 if not text:
                     continue
                 text = text[:MAX_TEXT_CHARS]
-                await handle_text_query(ws, text, llm, memory, tts, tools, tts_enabled)
+                await handle_text_query(ws, text, providers, memory, tts, tools, tts_enabled)
 
             elif event_type == "audio_chunk":
                 if not _rate_limiter.allow_audio(ws_id):
@@ -375,7 +421,7 @@ async def websocket_handler(
                         chunks = list(audio_buffer)
                         audio_buffer.clear()
                         await transcribe_and_query(
-                            ws, chunks, current_sample_rate, stt, llm, memory, tts, tools, tts_enabled
+                            ws, chunks, current_sample_rate, stt, providers, memory, tts, tools, tts_enabled
                         )
                         if stt.is_available:
                             await manager.send(ws, "status", {"status": "listening"})
@@ -385,7 +431,7 @@ async def websocket_handler(
                     chunks = list(audio_buffer)
                     audio_buffer.clear()
                     await transcribe_and_query(
-                        ws, chunks, current_sample_rate, stt, llm, memory, tts, tools, tts_enabled
+                        ws, chunks, current_sample_rate, stt, providers, memory, tts, tools, tts_enabled
                     )
                 else:
                     audio_buffer.clear()

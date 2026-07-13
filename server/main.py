@@ -46,6 +46,11 @@ tools = ToolRegistry()
 from core.persistent_memory import get_memory as _init_memory
 _init_memory()
 
+# Provider manager — cerveau LLM interchangeable (local par défaut)
+from core.providers import init_provider_manager
+from core.persistent_memory import _DB_PATH as _MEM_DB_PATH
+providers = init_provider_manager(llm, _MEM_DB_PATH.parent)
+
 
 async def _load_models_background() -> None:
     """Charge LLM + STT en background — Uvicorn reste accessible pendant ce temps."""
@@ -57,9 +62,12 @@ async def _load_models_background() -> None:
     # Notifier tous les clients WebSocket connectés que les modèles sont prêts
     from core.monitor import broadcast_direct as _broadcast_direct
     _broadcast_direct("server_status", {
-        "llm": llm.is_available,
+        "llm": providers.is_available,
         "stt": stt.is_available,
         "tts": tts.is_available,
+        "provider": providers.active.name,
+        "providerLabel": providers.active.label,
+        "providerModel": providers.active.model,
     })
 
 
@@ -85,7 +93,7 @@ app = FastAPI(title="JARVIS Core", version="3.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:1420", "http://127.0.0.1:1420", "tauri://localhost"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 app.include_router(router, prefix="/api")
@@ -94,7 +102,7 @@ app.include_router(router, prefix="/api")
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket) -> None:
     await websocket_handler(
-        ws, llm, stt, tts, tools,
+        ws, providers, stt, tts, tools,
         max_context_messages=settings.max_context_messages,
     )
 

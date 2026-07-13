@@ -50,6 +50,12 @@ class PersistentMemory:
                 summary TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS lessons (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                context TEXT NOT NULL,
+                lesson TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
             CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at DESC);
         """)
@@ -101,6 +107,38 @@ class PersistentMemory:
     def count(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+
+    def record_lesson(self, context: str, lesson: str) -> None:
+        """Journal des leçons apprises — alimenté par la boucle agent sur échec outil."""
+        now = datetime.utcnow().isoformat()
+        with self._lock:
+            # Dédoublonne : même leçon déjà connue → rafraîchit la date
+            row = self._conn.execute(
+                "SELECT id FROM lessons WHERE lesson = ?", (lesson.strip(),)
+            ).fetchone()
+            if row:
+                self._conn.execute(
+                    "UPDATE lessons SET created_at = ? WHERE id = ?", (now, row["id"])
+                )
+            else:
+                self._conn.execute(
+                    "INSERT INTO lessons(context, lesson, created_at) VALUES(?, ?, ?)",
+                    (context.strip()[:200], lesson.strip()[:300], now),
+                )
+            self._conn.commit()
+        logger.info(f"Leçon enregistrée: {lesson[:80]}")
+
+    def get_lessons_summary(self, limit: int = 8) -> str:
+        """Dernières leçons pour injection dans le system prompt."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT lesson FROM lessons ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        if not rows:
+            return ""
+        lines = ["\n\n## LEÇONS APPRISES (erreurs passées à ne pas répéter)\n"]
+        lines += [f"- {r['lesson']}" for r in rows]
+        return "\n".join(lines)
 
     def add_episode(self, summary: str) -> None:
         now = datetime.utcnow().isoformat()

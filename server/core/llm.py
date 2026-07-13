@@ -124,8 +124,8 @@ def parse_tool_call(response: str) -> tuple[str, dict] | None:
     return None
 
 
-def _build_system_prompt() -> str:
-    """Append persistent memory context to the base system prompt."""
+def build_default_system() -> str:
+    """System prompt de base + mémoire persistante (sans skills routés)."""
     try:
         from core.persistent_memory import get_memory
         ctx = get_memory().get_context_summary()
@@ -189,16 +189,22 @@ class LLMManager:
     def is_available(self) -> bool:
         return self._llm is not None
 
+    @property
+    def model_name(self) -> str:
+        return self._settings.model_path.stem
+
     async def stream(
         self,
         messages: list[dict[str, str]],
         max_tokens: int = 512,
+        system: str | None = None,
     ) -> AsyncGenerator[str, None]:
         if self._llm is None:
             yield "Je suis désolé Monsieur, le modèle LLM n'est pas chargé. Placez un fichier GGUF dans server/models/."
             return
 
-        system = _build_system_prompt()
+        if system is None:
+            system = build_default_system()
         # mistral-instruct ne supporte que user/assistant — injecte le system
         # dans le premier message utilisateur (format officiel Mistral v0.3)
         full_messages = _inject_system(system, messages)

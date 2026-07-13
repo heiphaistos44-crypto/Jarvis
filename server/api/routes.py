@@ -64,6 +64,42 @@ async def system_info() -> SystemInfoResponse:
     info = await asyncio.to_thread(get_system_info)
     return SystemInfoResponse(info=info)
 
+# ── Providers LLM ───────────────────────────────────────────────────────────
+
+class ProviderConfigRequest(BaseModel):
+    name: str
+    api_key: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    activate: bool = False
+
+
+@router.get("/providers")
+async def providers_status() -> dict:
+    """Liste des providers + provider actif. Les clés API sont masquées."""
+    from core.providers import get_provider_manager
+    return get_provider_manager().status()
+
+
+@router.post("/providers")
+async def providers_configure(req: ProviderConfigRequest) -> dict:
+    """Configure et/ou active un provider LLM. Localhost uniquement (bind 127.0.0.1)."""
+    from core.providers import get_provider_manager
+    pm = get_provider_manager()
+    if req.name != "local" and any(
+        v is not None for v in (req.api_key, req.model, req.base_url)
+    ):
+        error = pm.configure(req.name, {
+            "api_key": req.api_key, "model": req.model, "base_url": req.base_url,
+        })
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+    if req.activate:
+        error = pm.set_active(req.name)
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+    return pm.status()
+
 # ── Gmail OAuth ─────────────────────────────────────────────────────────────
 
 @router.get("/auth/gmail/status", response_model=GmailStatusResponse)
