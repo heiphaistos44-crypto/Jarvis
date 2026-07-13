@@ -25,3 +25,10 @@ scipy==1.17.1
 # Utilities
 python-multipart==0.0.31
 aiofiles==25.1.0
+
+# Providers LLM cloud (Anthropic + OpenAI-compatible, SSE)
+httpx==0.28.1
+
+# Dev / tests
+pytest==9.1.1
+pytest-asyncio==1.4.0

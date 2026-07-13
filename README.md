@@ -1,8 +1,8 @@
 <div align="center">
   <h1>J.A.R.V.I.S.</h1>
-  <p><strong>Assistant IA local style Iron Man — LLM GGUF, voix bidirectionnelle, 28 outils, 100% local.</strong></p>
+  <p><strong>Assistant IA local style Iron Man — Cerveau multi-API (local ou cloud), wake word « Hey Jarvis », HUD holographique 3D, 28 outils.</strong></p>
 
-  ![Version](https://img.shields.io/badge/version-3.0.0-blue)
+  ![Version](https://img.shields.io/badge/version-4.0.0-blue)
   ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?logo=windows)
   ![Stack](https://img.shields.io/badge/stack-Tauri%20v2%20%2B%20Python%20FastAPI-purple)
   ![CUDA](https://img.shields.io/badge/CUDA-12.1%2B-76B900?logo=nvidia)
@@ -13,13 +13,21 @@
 
 ## Description
 
-J.A.R.V.I.S. (*Just A Rather Very Intelligent System*) est un assistant IA entièrement local inspiré de l'Iron Man de Marvel. Il tourne sans aucune connexion cloud : le LLM Mistral-7B Q4 est exécuté localement via CUDA, la reconnaissance vocale (STT) et la synthèse vocale (TTS) sont assurées par Faster-Whisper et Piper. Une boucle agent multi-étapes enchaîne jusqu'à 5 appels d'outils par message, avec mémoire persistante SQLite entre les sessions.
+J.A.R.V.I.S. (*Just A Rather Very Intelligent System*) est un assistant IA local inspiré de l'Iron Man de Marvel. Par défaut il tourne sans aucune connexion cloud : le LLM Mistral-7B Q4 est exécuté localement via CUDA, la reconnaissance vocale (STT) et la synthèse vocale (TTS) sont assurées par Faster-Whisper et Piper. Depuis la v4.0, le cerveau est interchangeable : n'importe quelle API compatible OpenAI (OpenAI, Gemini, Ollama, Groq, DeepSeek, xAI, OpenRouter, Mistral, LM Studio, vLLM…) ou l'API Anthropic native peut prendre le relais, avec bascule automatique sur le cerveau local en cas de panne. Une boucle agent « Fable » (réflexion → outils → vérification) enchaîne jusqu'à 5 appels d'outils par message, guidée par 6 disciplines de raisonnement routées par intention, avec mémoire persistante et journal de leçons SQLite entre les sessions.
 
 ---
 
 ## Fonctionnalités
 
 - **LLM local 100% CUDA** — Mistral-7B-Instruct Q4_K_M via llama-cpp-python, contexte 8192 tokens, aucun appel cloud
+- **Cerveau multi-API** — onglet CERVEAU : Anthropic natif + toute API OpenAI-compatible (clé stockée côté serveur, jamais dans le client), fallback local automatique
+- **Wake word « Hey Jarvis »** — openWakeWord local (ONNX CPU), mode veille avec chime de confirmation, audio jamais transcrit ni conservé
+- **Disciplines Fable** — 6 skills de raisonnement (deep-reasoning, calibrated-judgment, verification, communication, token-economy, memory) routés par intention, variantes compacte/complète selon le cerveau
+- **Leçons apprises** — les échecs d'outils sont mémorisés et réinjectés au prompt pour ne pas être répétés
+- **Boot sequence Stark** — splash d'initialisation avec checks systèmes réels et arc reactor animé
+- **Hologramme 3D** — sphère de 6000 particules + anneaux orbitaux (three.js), audio-réactive sur la voix
+- **Voice orb** — overlay plein écran type Siri (écoute rouge / analyse ambre / parole verte)
+- **Timeline agent** — les étapes réflexion/outil/vérification s'affichent en direct
 - **STT temps réel** — Faster-Whisper (small), transcription instantanée du micro
 - **TTS naturel** — Piper TTS voix française (`fr_FR-upmc-medium`) avec compresseur et présence boost
 - **28 outils intégrés** — système, réseau, calcul, météo, email Gmail, gestion fichiers, mémoire persistante
@@ -38,9 +46,10 @@ J.A.R.V.I.S. (*Just A Rather Very Intelligent System*) est un assistant IA enti�
 | Couche | Technologies |
 |--------|-------------|
 | Desktop | Tauri v2 + Rust |
-| Frontend | React 18 + TypeScript + Tailwind CSS + Framer Motion |
+| Frontend | React 19 + TypeScript + Tailwind CSS + Framer Motion + three.js/R3F |
 | Backend | Python 3.12 + FastAPI + WebSocket |
-| LLM | Mistral-7B-Instruct-v0.3 Q4_K_M (GGUF) via llama-cpp-python CUDA |
+| LLM | Mistral-7B local (défaut) · Anthropic · toute API OpenAI-compatible |
+| Wake word | openWakeWord `hey_jarvis` (ONNX, CPU) |
 | STT | Faster-Whisper small |
 | TTS | Piper TTS (fr_FR-upmc-medium) |
 | Mémoire | SQLite (`core/persistent_memory.py`) |
@@ -109,7 +118,7 @@ npx tauri dev
 cd client
 npx tauri build
 # → client/src-tauri/target/release/JARVIS.exe
-# → client/src-tauri/target/release/bundle/nsis/JARVIS_3.0.0_x64-setup.exe
+# → client/src-tauri/target/release/bundle/nsis/JARVIS_4.0.0_x64-setup.exe
 ```
 
 Le script `LANCER-JARVIS.bat` démarre automatiquement le serveur Python puis l'interface.
@@ -142,6 +151,16 @@ Le script `LANCER-JARVIS.bat` démarre automatiquement le serveur Python puis l'
 ## Aperçu
 
 > Captures disponibles lors de la prochaine release publique.
+
+---
+
+## Crédits & inspirations
+
+L'interface cinématique et le système multi-provider portent des idées de deux projets
+open source (MIT) réimplémentées dans cette stack :
+
+- [harsh-raj00/my-jarvis](https://github.com/harsh-raj00/my-jarvis) — boot sequence, hologramme 3D, voice orb
+- [hzaid01/Jarvis](https://github.com/hzaid01/Jarvis) — architecture multi-provider LLM
 
 ---
 

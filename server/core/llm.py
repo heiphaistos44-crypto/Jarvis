@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 logger = get_logger("llm")
 
 SYSTEM_PROMPT = """\
-Tu es J.A.R.V.I.S. v3.0 — l'assistant IA personnel de Monsieur. Tu réponds toujours en français.
+Tu es J.A.R.V.I.S. v4.0 — l'assistant IA personnel de Monsieur. Tu réponds toujours en français.
 
 ## RÈGLES PRIORITAIRES
 
@@ -209,19 +209,41 @@ class LLMManager:
         # dans le premier message utilisateur (format officiel Mistral v0.3)
         full_messages = _inject_system(system, messages)
 
-        def _generate() -> object:
-            return self._llm.create_chat_completion(  # type: ignore[union-attr]
-                messages=full_messages,
-                max_tokens=max_tokens,
-                temperature=0.72,
-                top_p=0.9,
-                repeat_penalty=1.1,
-                stream=True,
-            )
+        # La génération llama-cpp est synchrone : elle tourne entièrement dans
+        # un thread et pousse les tokens dans une queue asyncio. L'event loop
+        # reste libre (pings WebSocket, autres clients) pendant l'inférence.
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[str | None | Exception] = asyncio.Queue()
+
+        def _generate_worker() -> None:
+            try:
+                gen = self._llm.create_chat_completion(  # type: ignore[union-attr]
+                    messages=full_messages,
+                    max_tokens=max_tokens,
+                    temperature=0.72,
+                    top_p=0.9,
+                    repeat_penalty=1.1,
+                    stream=True,
+                )
+                for chunk in gen:
+                    delta = chunk["choices"][0]["delta"]
+                    if content := delta.get("content"):
+                        loop.call_soon_threadsafe(queue.put_nowait, content)
+            except Exception as e:
+                loop.call_soon_threadsafe(queue.put_nowait, e)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
 
         async with self._lock:
-            gen = await asyncio.to_thread(_generate)
-            for chunk in gen:  # type: ignore[union-attr]
-                delta = chunk["choices"][0]["delta"]
-                if content := delta.get("content"):
-                    yield content
+            worker = loop.run_in_executor(None, _generate_worker)
+            try:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        break
+                    if isinstance(item, Exception):
+                        logger.error(f"Erreur génération LLM: {item}")
+                        break
+                    yield item
+            finally:
+                await worker

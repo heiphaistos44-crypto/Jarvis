@@ -32,4 +32,17 @@ def build_system_prompt(tier: str, user_text: str) -> str:
     except Exception as e:
         logger.warning(f"Mémoire indisponible pour le prompt: {e}")
 
+    # Rappel final (biais de récence) : sans lui, le 7B répond de mémoire au
+    # lieu d'appeler les outils quand le prompt s'allonge.
+    parts.append(
+        "\n\n## RAPPEL CRITIQUE — OUTILS\n\n"
+        "Pour toute question sur : météo, actualités, recherche web, heure/date, "
+        "calcul, conversion, état système, fichiers, emails, presse-papiers — tu ne "
+        "connais PAS la réponse. Tu DOIS d'abord émettre "
+        '<JARVIS_TOOL>{"name": "...", "args": {...}}</JARVIS_TOOL> '
+        "et attendre le résultat. Ne réponds JAMAIS de mémoire à ces questions. "
+        'Exemple : « calcule 17*23 » → <JARVIS_TOOL>{"name": "calculate", '
+        '"args": {"expression": "17*23"}}</JARVIS_TOOL>'
+    )
+
     return "".join(parts)

@@ -61,10 +61,12 @@ async def _agent_loop(
             "message": f"{label} indisponible — bascule sur le cerveau local.",
         })
 
+    tag_open = "<JARVIS_TOOL>"
+
     for _iteration in range(MAX_AGENT_ITERATIONS):
         full_response = ""
         sentence_buf = ""
-        in_tool_tag = False
+        pending = ""  # tokens retenus tant qu'ils peuvent être un début de balise
 
         await manager.send(ws, "agent_step", {
             "phase": "thinking",
@@ -72,33 +74,58 @@ async def _agent_loop(
             "messageId": message_id,
         })
 
-        async for token in providers.stream(
-            system, messages, max_tokens=max_tokens, on_fallback=_notify_fallback,
-        ):
-            full_response += token
-            # Détecter début de balise tool → bufferiser sans envoyer
-            if "<JARVIS_TOOL>" in full_response and "</JARVIS_TOOL>" not in full_response:
-                in_tool_tag = True
-            if in_tool_tag:
-                if "</JARVIS_TOOL>" in full_response:
-                    in_tool_tag = False
-                    # Balise complète → on arrête le streaming ici
-                    break
-                continue  # Bufferiser, pas encore au client
-
-            # Token normal → envoyer au client
-            await manager.send(ws, "token", {"token": token, "messageId": message_id})
-            accumulated += token
-
-            # Buffer TTS phrase par phrase
+        async def _emit(text: str) -> None:
+            nonlocal accumulated, sentence_buf
+            if not text:
+                return
+            await manager.send(ws, "token", {"token": text, "messageId": message_id})
+            accumulated += text
             if tts_enabled:
-                sentence_buf += token
+                sentence_buf += text
                 m = _SENTENCE_BOUNDARY.search(sentence_buf)
                 if m and len(sentence_buf.strip()) > 15:
                     phrase = sentence_buf[: m.start() + 1].strip()
                     sentence_buf = sentence_buf[m.end():]
                     if phrase:
                         await tts_queue.put(phrase)
+
+        in_tool_tag = False
+        async for token in providers.stream(
+            system, messages, max_tokens=max_tokens, on_fallback=_notify_fallback,
+        ):
+            full_response += token
+            if in_tool_tag:
+                if "</JARVIS_TOOL>" in full_response:
+                    break  # Balise complète → exécuter l'outil
+                continue
+
+            pending += token
+            idx = pending.find(tag_open)
+            if idx != -1:
+                # Balise détectée : émettre le texte avant, retenir le reste
+                await _emit(pending[:idx])
+                pending = ""
+                in_tool_tag = True
+                if "</JARVIS_TOOL>" in full_response:
+                    break
+                continue
+
+            # Retenir le plus long suffixe de pending qui est un préfixe de la
+            # balise (ex. "<JARVIS_TO") — le reste peut partir au client
+            hold = 0
+            max_hold = min(len(pending), len(tag_open) - 1)
+            for size in range(max_hold, 0, -1):
+                if tag_open.startswith(pending[-size:]):
+                    hold = size
+                    break
+            if len(pending) > hold:
+                await _emit(pending[: len(pending) - hold])
+                pending = pending[len(pending) - hold:] if hold else ""
+
+        # Fin de stream sans balise → flush du buffer retenu
+        if not in_tool_tag and pending:
+            await _emit(pending)
+            pending = ""
 
         # Vérifier si tool call présent dans la réponse complète
         tool_result = parse_tool_call(full_response)
@@ -146,8 +173,10 @@ async def _agent_loop(
                     "role": "user",
                     "content": (
                         f"[RÉSULTAT OUTIL {name}]\n{result}\n\n"
-                        "Continue ta réponse en français en tenant compte de ce résultat. "
-                        "Ne répète pas ce que tu viens de faire."
+                        "Tu disposes maintenant du résultat ci-dessus. Réponds directement "
+                        "à Monsieur en français, en une ou deux phrases. N'émets PAS de "
+                        "nouvelle balise JARVIS_TOOL pour cette question — le résultat "
+                        "est déjà là."
                     ),
                 },
             ]
