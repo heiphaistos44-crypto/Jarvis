@@ -29,10 +29,21 @@ export function useWebSocket() {
 
     ws.onopen = () => {
       reconnectAttempts.current = 0;
-      useJarvisStore.getState().setConnected(true);
-      useJarvisStore.getState().setWsSend((event) => {
+      const store = useJarvisStore.getState();
+      store.setConnected(true);
+      store.setWsSend((event) => {
         if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(event));
       });
+      // Synchronise la voix française choisie dès la connexion — le serveur
+      // ne doit jamais parler avec une autre voix que celle affichée dans l'UI.
+      ws.send(JSON.stringify({
+        type: "set_voice",
+        payload: { voice: store.selectedVoice },
+      }));
+      ws.send(JSON.stringify({
+        type: "set_tts",
+        payload: { enabled: store.ttsEnabled },
+      }));
     };
 
     ws.onmessage = (evt) => {

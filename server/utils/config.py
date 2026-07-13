@@ -43,7 +43,9 @@ class Settings(BaseSettings):
     whisper_compute_type: str = "int8" if getattr(_sys, "frozen", False) else _profile.whisper_compute
 
     piper_exe: Path = MODELS_DIR / "piper" / "piper.exe"
-    piper_voice: Path = MODELS_DIR / "piper" / "fr_FR-mls-medium.onnx"
+    # Voix par défaut : UPMC = masculine française classique (la plus « JARVIS »).
+    # Doit rester alignée avec selectedVoice par défaut côté client.
+    piper_voice: Path = MODELS_DIR / "piper" / "fr_FR-upmc-medium.onnx"
 
     max_context_messages: int = 30
     hw_profile: str = _profile.name

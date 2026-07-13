@@ -191,7 +191,7 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   pendingMessageId: null,
   isMicActive: false,
   ttsEnabled: true,
-  selectedVoice: "fr_FR-upmc-medium",
+  selectedVoice: localStorage.getItem("jarvis_voice") || "fr_FR-upmc-medium",
   wsSend: null,
   sttAvailable: false,
   llmAvailable: false,
@@ -216,7 +216,10 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   },
   setMicActive: (isMicActive) => set({ isMicActive }),
   setTtsEnabled: (ttsEnabled) => set({ ttsEnabled }),
-  setSelectedVoice: (selectedVoice) => set({ selectedVoice }),
+  setSelectedVoice: (selectedVoice) => {
+    localStorage.setItem("jarvis_voice", selectedVoice);
+    set({ selectedVoice });
+  },
   setWsSend: (fn) => set({ wsSend: fn }),
   clearMessages: () => {
     clearTtsQueue();
