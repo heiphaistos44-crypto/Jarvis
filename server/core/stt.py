@@ -34,12 +34,22 @@ class STTManager:
     def load(self) -> None:
         try:
             from faster_whisper import WhisperModel  # type: ignore[import]
+            from pathlib import Path
+            model_ref = self._settings.whisper_model
+            # Portable : si le dossier local n'existe pas, retomber sur le nom
+            # de taille ("small") — faster-whisper le télécharge automatiquement
+            # au premier lancement puis le met en cache.
+            p = Path(model_ref)
+            if not p.exists() and ("/" in model_ref or "\\" in model_ref):
+                size = p.name.replace("faster-whisper-", "") or "small"
+                logger.info(f"Modèle Whisper local absent — téléchargement de '{size}'...")
+                model_ref = size
             self._model = WhisperModel(
-                self._settings.whisper_model,
+                model_ref,
                 device=self._settings.whisper_device,
                 compute_type=self._settings.whisper_compute_type,
             )
-            logger.info(f"Whisper chargé: {self._settings.whisper_model}")
+            logger.info(f"Whisper chargé: {model_ref}")
         except Exception as e:
             logger.warning(f"STT non disponible: {e}")
 

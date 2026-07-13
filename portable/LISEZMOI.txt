@@ -1,0 +1,37 @@
+J.A.R.V.I.S. v4.6.0 - Portable TOUT-EN-UN
+=========================================
+
+Demarrage rapide :
+  1) Dezipper ce dossier ou vous voulez
+  2) Double-cliquer LANCER-JARVIS.bat
+  3) Au premier lancement, le cerveau local (Mistral-7B, 4,1 GB) et la
+     reconnaissance vocale Whisper (465 MB) se telechargent
+     automatiquement — une seule fois, reprise possible si interrompu.
+     Ensuite tout est 100 % local et hors-ligne.
+
+Contenu :
+  - JARVIS.exe          interface holographique (Tauri)
+  - jarvis_server.exe   serveur IA compile (LLM + voix + micro + outils)
+  - models/             Whisper (reconnaissance vocale) + Piper (voix locale)
+  - skills/             disciplines de raisonnement Fable
+  - data/               memoire persistante (creee au premier lancement)
+
+Configuration requise :
+  - Windows 10/11 x64
+  - GPU NVIDIA (CUDA) recommande pour le cerveau local — sans GPU,
+    configurez un cerveau cloud dans Reglages -> CERVEAU (Pollinations
+    fonctionne gratuitement sans cle)
+  - ~6 GB d'espace disque apres telechargement du modele
+
+Voix :
+  - En ligne : voix neurale Henri (naturelle) + effet armure
+  - Hors-ligne : bascule automatique sur la voix locale Piper
+
+Protection materiel :
+  - Demarrage en mode Economie, VRAM plafonnee a 80 %, retrogradation
+    automatique du profil si depassement (Reglages -> PERF)
+
+Depot et documentation :
+  https://github.com/Heiphaistos/Jarvis-AppWindows
+
+Licence MIT - (c) 2026 Heiphaistos

@@ -21,10 +21,33 @@ if llama_cpp_path.exists():
         for f in llama_lib.iterdir():
             added_datas.append((str(f), "llama_cpp/lib"))
 
+# DLLs CUDA (pip nvidia-*) : ggml-cuda.dll en dépend. En frozen,
+# _add_cuda_dll_dirs ne les trouve pas (packages data-only) → les placer
+# DANS llama_cpp/lib, à côté de ggml-cuda.dll, sinon LoadLibrary ouvre une
+# boîte d'erreur invisible et le chargement du modèle reste bloqué.
+for _nv_sub in ("cublas", "cuda_runtime"):
+    _nv_bin = venv_site / "nvidia" / _nv_sub / "bin"
+    if _nv_bin.exists():
+        for dll in _nv_bin.glob("*.dll"):
+            added_datas.append((str(dll), "llama_cpp/lib"))
+
 # faster_whisper — assets
 fw_path = venv_site / "faster_whisper"
 if fw_path.exists():
     added_datas.append((str(fw_path / "assets"), "faster_whisper/assets"))
+
+# openwakeword — modèles ONNX embarqués (hey_jarvis + mel/embedding)
+oww_models = venv_site / "openwakeword" / "resources" / "models"
+if oww_models.exists():
+    for f in oww_models.glob("*.onnx"):
+        added_datas.append((str(f), "openwakeword/resources/models"))
+
+# Skills Fable — chargés depuis <exe>/skills en mode frozen, mais on les
+# embarque aussi en interne au cas où
+skills_dir = Path("skills")
+if skills_dir.exists():
+    for f in skills_dir.glob("*.md"):
+        added_datas.append((str(f), "skills"))
 
 a = Analysis(
     ["main.py"],
@@ -60,6 +83,21 @@ a = Analysis(
         "pydantic_settings",
         "aiohttp",
         "aiofiles",
+        "httpx",
+        "edge_tts",
+        "openwakeword",
+        "openwakeword.model",
+        "openwakeword.utils",
+        "onnxruntime",
+        # pkgutil.iter_modules en mode frozen : déclarer explicitement les
+        # modules découverts dynamiquement (tools auto-discovery + providers)
+        "tools.calc_tools", "tools.email_tools", "tools.file_tools",
+        "tools.info_tools", "tools.memory_tools", "tools.system_tools",
+        "tools.web_tools", "tools.windows_tools", "tools.decorator",
+        "core.providers.base", "core.providers.local_llama",
+        "core.providers.anthropic_provider", "core.providers.openai_compat",
+        "core.providers.manager", "core.council", "core.intent",
+        "core.skills", "core.prompt", "core.wakeword", "utils.perf",
         "pyperclip",
         "PIL",
         "PIL.Image",
