@@ -22,8 +22,10 @@ logger = get_logger("websocket")
 
 # Fin de parole par détection de silence — plus de découpage arbitraire qui
 # coupait les phrases en morceaux toutes les ~2,7 s.
-SPEECH_RMS = 0.008          # au-dessus : de la parole est présente
-SILENCE_CHUNKS_END = 11     # ~0.9 s de silence après parole → transcrire
+SPEECH_RMS = 0.004          # au-dessus : de la parole est présente (voix faible ~0.009)
+SPEECH_CONFIRM_CHUNKS = 2   # 2 chunks consécutifs pour confirmer (anti-clic)
+SILENCE_CHUNKS_END = 14     # ~1.2 s de silence après parole → transcrire
+PRE_ROLL_CHUNKS = 4         # contexte gardé avant le 1er chunk de parole
 MAX_UTTERANCE_CHUNKS = 360  # ~30 s : borne dure anti-débordement
 MAX_PAYLOAD_BYTES = 2 * 1024 * 1024   # 2 MB — audio chunk upper bound
 MAX_TEXT_CHARS = 2000
@@ -515,6 +517,7 @@ async def websocket_handler(
     audio_buffer: list[list[float]] = []
     current_sample_rate: int = 16000
     speech_detected: bool = False   # de la parole a été entendue dans le buffer
+    speech_run: int = 0             # chunks de parole consécutifs (confirmation)
     silence_run: int = 0            # chunks de silence consécutifs
     tts_enabled: bool = True
     wake_detector = None  # lazy — instancié au 1er wake_audio (modèle stateful par connexion)
@@ -594,17 +597,28 @@ async def websocket_handler(
                         _sq += _v * _v
                     _rms = (_sq / max(len(chunk_data), 1)) ** 0.5
                     if _rms >= SPEECH_RMS:
-                        speech_detected = True
+                        speech_run += 1
                         silence_run = 0
+                        if speech_run >= SPEECH_CONFIRM_CHUNKS:
+                            speech_detected = True
                     else:
+                        speech_run = 0
                         silence_run += 1
 
-                    end_of_speech = speech_detected and silence_run >= SILENCE_CHUNKS_END
+                    if not speech_detected:
+                        # Pas encore de parole : ne garder qu'un court pré-roll —
+                        # jamais des secondes de silence envoyées à Whisper.
+                        if len(audio_buffer) > PRE_ROLL_CHUNKS:
+                            audio_buffer.pop(0)
+                        continue
+
+                    end_of_speech = silence_run >= SILENCE_CHUNKS_END
                     overflow = len(audio_buffer) >= MAX_UTTERANCE_CHUNKS
                     if end_of_speech or overflow:
                         chunks = list(audio_buffer)
                         audio_buffer.clear()
                         speech_detected = False
+                        speech_run = 0
                         silence_run = 0
                         if query_task is not None and not query_task.done():
                             query_task.cancel()
@@ -635,7 +649,15 @@ async def websocket_handler(
                     wake_detector.reset()
 
             elif event_type == "mic_stop":
+                if not speech_detected:
+                    # Que du silence dans le buffer — rien à transcrire
+                    audio_buffer.clear()
+                    speech_run = 0
+                    silence_run = 0
+                    await manager.send(ws, "status", {"status": "idle"})
+                    continue
                 speech_detected = False
+                speech_run = 0
                 silence_run = 0
                 if audio_buffer and stt.is_available:
                     chunks = list(audio_buffer)

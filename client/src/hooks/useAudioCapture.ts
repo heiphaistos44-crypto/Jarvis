@@ -29,6 +29,11 @@ export function useAudioCapture(send: (e: ClientEvent) => void) {
         (event) => {
           const { data, sampleRate } = event.payload;
 
+          // Anti-écho : quand JARVIS parle (TTS dans les haut-parleurs), le
+          // micro capte sa propre voix — ne pas la lui renvoyer à transcrire.
+          const st = useJarvisStore.getState().status;
+          if (st === "speaking" || st === "processing") return;
+
           // Détection silence
           let rms = 0;
           for (let i = 0; i < data.length; i++) rms += data[i] * data[i];
