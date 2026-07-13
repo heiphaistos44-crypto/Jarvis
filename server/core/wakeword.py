@@ -10,7 +10,9 @@ logger = get_logger("wakeword")
 
 _MODEL_NAME = "hey_jarvis_v0.1"
 _FRAME_SAMPLES = 1280          # 80 ms à 16 kHz — taille attendue par openwakeword
-_DETECTION_THRESHOLD = 0.5
+# 0.4 : le modèle est entraîné sur l'anglais — la prononciation française de
+# « Hey Jarvis » score un peu plus bas qu'un locuteur natif.
+_DETECTION_THRESHOLD = 0.4
 _COOLDOWN_S = 2.0              # anti re-déclenchement pendant la même phrase
 
 
@@ -74,6 +76,8 @@ class WakeWordDetector:
         int16 = (np.clip(samples, -1.0, 1.0) * 32767).astype(np.int16)
 
         score = await asyncio.to_thread(self._process_sync, int16)
+        if score > 0.15:
+            logger.debug(f"Wake score: {score:.2f} (seuil {_DETECTION_THRESHOLD})")
 
         now = time.monotonic()
         if score >= _DETECTION_THRESHOLD and (now - self._last_detection) > _COOLDOWN_S:

@@ -104,6 +104,12 @@ class STTManager:
                 no_speech_threshold=NO_SPEECH_THRESHOLD,
                 condition_on_previous_text=False,  # évite les hallucinations chaînées
                 temperature=0.0,                   # décodage greedy pur — plus stable
+                # Biais de vocabulaire : oriente Whisper vers le registre réel
+                # des requêtes (questions à un assistant, français courant)
+                initial_prompt=(
+                    "Commandes vocales en français adressées à JARVIS, assistant "
+                    "personnel : questions, météo, heure, calculs, système."
+                ),
             )
 
             result_parts: list[str] = []

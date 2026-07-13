@@ -25,7 +25,7 @@ logger = get_logger("websocket")
 SPEECH_RMS = 0.004          # au-dessus : de la parole est présente (voix faible ~0.009)
 SPEECH_CONFIRM_CHUNKS = 2   # 2 chunks consécutifs pour confirmer (anti-clic)
 SILENCE_CHUNKS_END = 14     # ~1.2 s de silence après parole → transcrire
-PRE_ROLL_CHUNKS = 4         # contexte gardé avant le 1er chunk de parole
+PRE_ROLL_CHUNKS = 7         # ~0.6 s gardées avant la parole — 1er mot jamais tronqué
 MAX_UTTERANCE_CHUNKS = 360  # ~30 s : borne dure anti-débordement
 MAX_PAYLOAD_BYTES = 2 * 1024 * 1024   # 2 MB — audio chunk upper bound
 MAX_TEXT_CHARS = 2000
@@ -628,15 +628,16 @@ async def websocket_handler(
 
             elif event_type == "wake_audio":
                 # Mode veille : frames analysées pour « Hey Jarvis » uniquement,
-                # jamais bufferisées pour le STT.
-                if not _rate_limiter.allow_audio(ws_id):
-                    continue
+                # jamais bufferisées pour le STT. PAS de rate limiter ici : la
+                # veille émet ~12 chunks/s en continu — la limite de 300/min
+                # s'épuisait en 25 s et tuait silencieusement la détection.
                 chunk_data = payload.get("data")
-                if not isinstance(chunk_data, list):
+                if not isinstance(chunk_data, list) or len(chunk_data) > 20000:
                     continue
                 if wake_detector is None:
                     from core.wakeword import WakeWordDetector
                     wake_detector = WakeWordDetector()
+                    logger.info("Mode veille « Hey Jarvis » actif sur cette connexion")
                     if not wake_detector.is_available:
                         await manager.send(ws, "wake_unavailable", {})
                         continue

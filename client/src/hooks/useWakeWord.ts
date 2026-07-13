@@ -79,7 +79,9 @@ export function useWakeWord(
       );
       await invoke("start_mic");
       useJarvisStore.getState().setStatus("standby");
-    } catch {
+      console.log("[JARVIS-WAKE] Mode veille actif — dites « Hey Jarvis »");
+    } catch (e) {
+      console.warn("[JARVIS-WAKE] Échec démarrage veille (retry dans 4 s):", e);
       standbyActiveRef.current = false;
       unlistenRef.current?.();
       unlistenRef.current = null;
@@ -98,6 +100,12 @@ export function useWakeWord(
   useEffect(() => {
     if (shouldStandby) {
       void startStandby();
+      // Retry périodique : si start_mic a échoué (périphérique occupé au
+      // moment du basculement), la veille se réarme toute seule.
+      const retry = window.setInterval(() => {
+        if (!standbyActiveRef.current) void startStandby();
+      }, 4000);
+      return () => clearInterval(retry);
     } else if (standbyActiveRef.current && !wakeDetected) {
       void stopStandby();
     }
