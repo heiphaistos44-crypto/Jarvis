@@ -13,7 +13,7 @@ const JarvisScene = lazy(() =>
   import("./components/Scene/JarvisScene").then((m) => ({ default: m.JarvisScene }))
 );
 import { AgentSteps } from "./components/AgentSteps/AgentSteps";
-import { useJarvisStore, THEMES } from "./stores/jarvisStore";
+import { useJarvisStore, accentOf } from "./stores/jarvisStore";
 import type { JarvisStatus } from "./types";
 
 function HexGrid() {
@@ -146,8 +146,9 @@ function LeftPanel() {
   }, [isConnected]);
 
   const theme = useJarvisStore((s) => s.theme);
+  const customAccent = useJarvisStore((s) => s.customAccent);
   const statusColors: Record<JarvisStatus, string> = {
-    idle: THEMES[theme].accent,
+    idle: accentOf(theme, customAccent),
     standby: "#3388cc",
     listening: "#00ff88",
     processing: "#ffaa00",
@@ -428,7 +429,7 @@ function Header() {
           <span ref={timeRef} />
         </span>
         <div className="w-px h-3 bg-cyan-900/40" />
-        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.5.0</span>
+        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.6.0</span>
         <div className="w-px h-3 bg-cyan-900/40" />
         <SettingsPanel />
         <div className="w-px h-3 bg-cyan-900/40" />

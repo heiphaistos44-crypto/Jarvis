@@ -106,15 +106,29 @@ function buildJarvisChain(ctx: AudioContext): AudioNode {
 }
 
 // ── Thèmes esthétiques ───────────────────────────────────────────────────────
-export type ThemeName = "arctic" | "mark3" | "emerald" | "amethyst";
-export type HoloStyle = "sphere" | "reactor" | "galaxy";
+export type ThemeName =
+  | "arctic" | "mark3" | "emerald" | "amethyst"
+  | "crimson" | "solar" | "silver" | "neon" | "custom";
+export type HoloStyle = "sphere" | "reactor" | "galaxy" | "dna" | "matrix" | "vortex";
+export type HoloDensity = "low" | "normal" | "high";
+export type HoloSpeed = "slow" | "normal" | "fast";
 
 export const THEMES: Record<ThemeName, { label: string; accent: string; accentSoft: string }> = {
   arctic:   { label: "Arctic (classique)", accent: "#00d4ff", accentSoft: "#0088aa" },
   mark3:    { label: "Mark III (rouge & or)", accent: "#ffb340", accentSoft: "#cc4422" },
   emerald:  { label: "Émeraude", accent: "#00ff9d", accentSoft: "#00aa66" },
   amethyst: { label: "Améthyste", accent: "#b388ff", accentSoft: "#7744cc" },
+  crimson:  { label: "Crimson", accent: "#ff3355", accentSoft: "#aa1133" },
+  solar:    { label: "Solar", accent: "#ffdd44", accentSoft: "#cc8800" },
+  silver:   { label: "Argent", accent: "#cfe8ff", accentSoft: "#7799bb" },
+  neon:     { label: "Néon Rose", accent: "#ff44dd", accentSoft: "#aa2299" },
+  custom:   { label: "Personnalisé", accent: "#00d4ff", accentSoft: "#0088aa" },
 };
+
+/** Accent effectif du thème courant (gère la couleur personnalisée). */
+export function accentOf(theme: ThemeName, customAccent: string): string {
+  return theme === "custom" ? customAccent : THEMES[theme].accent;
+}
 
 function _stored<T extends string>(key: string, valid: readonly T[], fallback: T): T {
   const v = localStorage.getItem(key);
@@ -242,14 +256,21 @@ interface JarvisState {
   councilEnabled: boolean;
   setCouncilEnabled: (v: boolean) => void;
   metrics: { cpu: number; ram: number; gpu: number | null; vram: number | null };
+  perfActive: string;
   sendQuery: (text: string) => void;
   stopGeneration: () => void;
   armorFx: boolean;
   setArmorFx: (v: boolean) => void;
   theme: ThemeName;
   setTheme: (t: ThemeName) => void;
+  customAccent: string;
+  setCustomAccent: (c: string) => void;
   holoStyle: HoloStyle;
   setHoloStyle: (h: HoloStyle) => void;
+  holoDensity: HoloDensity;
+  setHoloDensity: (d: HoloDensity) => void;
+  holoSpeed: HoloSpeed;
+  setHoloSpeed: (s: HoloSpeed) => void;
   layoutSide: "left" | "right";
   setLayoutSide: (s: "left" | "right") => void;
 
@@ -301,20 +322,44 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
     set({ councilEnabled });
   },
   metrics: { cpu: 0, ram: 0, gpu: null, vram: null },
+  perfActive: "",
   armorFx: localStorage.getItem("jarvis_armor_fx") !== "0",
   setArmorFx: (armorFx) => {
     localStorage.setItem("jarvis_armor_fx", armorFx ? "1" : "0");
     set({ armorFx });
   },
-  theme: _stored("jarvis_theme", ["arctic", "mark3", "emerald", "amethyst"] as const, "arctic"),
+  theme: _stored(
+    "jarvis_theme",
+    ["arctic", "mark3", "emerald", "amethyst", "crimson", "solar", "silver", "neon", "custom"] as const,
+    "arctic",
+  ),
   setTheme: (theme) => {
     localStorage.setItem("jarvis_theme", theme);
     set({ theme });
   },
-  holoStyle: _stored("jarvis_holo", ["sphere", "reactor", "galaxy"] as const, "sphere"),
+  customAccent: localStorage.getItem("jarvis_custom_accent") || "#00d4ff",
+  setCustomAccent: (customAccent) => {
+    localStorage.setItem("jarvis_custom_accent", customAccent);
+    set({ customAccent });
+  },
+  holoStyle: _stored(
+    "jarvis_holo",
+    ["sphere", "reactor", "galaxy", "dna", "matrix", "vortex"] as const,
+    "sphere",
+  ),
   setHoloStyle: (holoStyle) => {
     localStorage.setItem("jarvis_holo", holoStyle);
     set({ holoStyle });
+  },
+  holoDensity: _stored("jarvis_holo_density", ["low", "normal", "high"] as const, "normal"),
+  setHoloDensity: (holoDensity) => {
+    localStorage.setItem("jarvis_holo_density", holoDensity);
+    set({ holoDensity });
+  },
+  holoSpeed: _stored("jarvis_holo_speed", ["slow", "normal", "fast"] as const, "normal"),
+  setHoloSpeed: (holoSpeed) => {
+    localStorage.setItem("jarvis_holo_speed", holoSpeed);
+    set({ holoSpeed });
   },
   layoutSide: _stored("jarvis_layout", ["left", "right"] as const, "left"),
   setLayoutSide: (layoutSide) => {
@@ -534,6 +579,10 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
 
       case "system_metrics":
         set({ metrics: event.payload });
+        break;
+
+      case "perf_changed":
+        set({ perfActive: event.payload.active });
         break;
 
       case "system_alert": {

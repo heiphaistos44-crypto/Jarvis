@@ -39,6 +39,22 @@ PROFILES: dict[str, PerfProfile] = {
 }
 
 
+# Ordre croissant de gourmandise — sert au safe-boot et aux rétrogradations
+ORDER = ["eco", "balanced", "max"]
+
+# Plafond de sécurité matériel : la VRAM ne doit jamais rester au-dessus
+VRAM_CEILING_PCT = 80.0
+
+
+def downgrade_of(name: str) -> str | None:
+    """Profil un cran en dessous, ou None si déjà au minimum."""
+    try:
+        idx = ORDER.index(name)
+    except ValueError:
+        return "eco"
+    return ORDER[idx - 1] if idx > 0 else None
+
+
 def _config_path() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent / "data" / "perf.json"

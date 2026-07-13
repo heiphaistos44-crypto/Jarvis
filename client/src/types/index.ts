@@ -76,7 +76,8 @@ export type ServerEvent =
   | {
       type: "system_metrics";
       payload: { cpu: number; ram: number; gpu: number | null; vram: number | null };
-    };
+    }
+  | { type: "perf_changed"; payload: { active: string } };
 
 export type ClientEvent =
   | { type: "text_query"; payload: { text: string; council?: boolean } }

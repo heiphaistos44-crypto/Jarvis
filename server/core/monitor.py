@@ -15,6 +15,18 @@ ALERT_COOLDOWN = 300     # 5 minutes minimum entre deux alertes du même type
 _last_alerts: dict[str, float] = {}
 _subscribers: set[asyncio.Queue] = set()
 
+# Gardien VRAM (protection matériel) — callback async enregistré par main.py
+VRAM_GUARD_PCT = 80.0
+_VRAM_GUARD_TICKS = 4        # ~12 s au-dessus du plafond avant intervention
+_vram_guardian = None
+_vram_over_count = 0
+
+
+def set_vram_guardian(callback) -> None:
+    """Enregistre le protocole de rétrogradation (async callback(vram_pct))."""
+    global _vram_guardian
+    _vram_guardian = callback
+
 
 def subscribe() -> asyncio.Queue:
     """Abonne un client WebSocket aux alertes. Retourne sa queue."""
@@ -113,7 +125,9 @@ def _gpu_stats() -> tuple[float, float] | None:
 
 
 async def _push_metrics() -> None:
-    """Métriques temps réel (CPU/RAM/GPU) poussées au HUD toutes les 3 s."""
+    """Métriques temps réel (CPU/RAM/GPU) poussées au HUD toutes les 3 s.
+    Déclenche le protocole matériel si la VRAM reste au-dessus du plafond."""
+    global _vram_over_count
     cpu = psutil.cpu_percent(interval=None)
     ram = psutil.virtual_memory().percent
     gpu = await asyncio.to_thread(_gpu_stats)
@@ -123,6 +137,19 @@ async def _push_metrics() -> None:
         "gpu": round(gpu[0], 1) if gpu else None,
         "vram": round(gpu[1], 1) if gpu else None,
     })
+
+    if gpu is not None and _vram_guardian is not None:
+        vram = gpu[1]
+        if vram > VRAM_GUARD_PCT:
+            _vram_over_count += 1
+            if _vram_over_count >= _VRAM_GUARD_TICKS:
+                _vram_over_count = 0
+                try:
+                    await _vram_guardian(vram)
+                except Exception as e:
+                    logger.error(f"Gardien VRAM en échec: {e}")
+        else:
+            _vram_over_count = 0
 
 
 async def run_monitor() -> None:

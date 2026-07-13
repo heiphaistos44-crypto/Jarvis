@@ -1,15 +1,17 @@
 import { useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { useJarvisStore, getTtsAnalyser, THEMES } from "../../stores/jarvisStore";
-import type { HoloStyle } from "../../stores/jarvisStore";
+import { useJarvisStore, getTtsAnalyser, accentOf } from "../../stores/jarvisStore";
+import type { HoloStyle, HoloDensity, HoloSpeed } from "../../stores/jarvisStore";
 import type { JarvisStatus } from "../../types";
 
-const PARTICLE_COUNT = 6000;
+const DENSITY_COUNTS: Record<HoloDensity, number> = { low: 3000, normal: 6000, high: 11000 };
+const SPEED_FACTORS: Record<HoloSpeed, number> = { slow: 0.5, normal: 1, fast: 1.8 };
 
 /** Couleur pilotée par le statut — idle suit l'accent du thème actif. */
 function statusColor(status: JarvisStatus): string {
-  const accent = THEMES[useJarvisStore.getState().theme].accent;
+  const s = useJarvisStore.getState();
+  const accent = accentOf(s.theme, s.customAccent);
   const map: Record<JarvisStatus, string> = {
     idle: accent,
     standby: "#3388cc",
@@ -33,7 +35,7 @@ function readTtsLevel(buf: Uint8Array): number {
 
 // ── Générateurs de nuages de points par style ────────────────────────────────
 
-function genSphere(): Float32Array {
+function genSphere(PARTICLE_COUNT: number): Float32Array {
   const pos = new Float32Array(PARTICLE_COUNT * 3);
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     // Distribution uniforme sur la sphère (méthode de Marsaglia)
@@ -48,7 +50,7 @@ function genSphere(): Float32Array {
   return pos;
 }
 
-function genReactor(): Float32Array {
+function genReactor(PARTICLE_COUNT: number): Float32Array {
   // Anneaux concentriques denses face caméra + moyeu central — arc reactor
   const pos = new Float32Array(PARTICLE_COUNT * 3);
   for (let i = 0; i < PARTICLE_COUNT; i++) {
@@ -64,7 +66,7 @@ function genReactor(): Float32Array {
   return pos;
 }
 
-function genGalaxy(): Float32Array {
+function genGalaxy(PARTICLE_COUNT: number): Float32Array {
   // Spirale à 3 bras, légèrement bombée au centre
   const pos = new Float32Array(PARTICLE_COUNT * 3);
   const ARMS = 3;
@@ -82,26 +84,94 @@ function genGalaxy(): Float32Array {
   return pos;
 }
 
-const GENERATORS: Record<HoloStyle, () => Float32Array> = {
+function genDna(PARTICLE_COUNT: number): Float32Array {
+  // Double hélice verticale + barreaux
+  const pos = new Float32Array(PARTICLE_COUNT * 3);
+  const TURNS = 3.2;
+  const HEIGHT = 4.2;
+  const R = 0.85;
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const kind = i % 5; // 2 brins denses + 1 particule de barreau sur 5
+    const t = Math.random();
+    const angle = t * Math.PI * 2 * TURNS;
+    const y = (t - 0.5) * HEIGHT;
+    if (kind < 2) {
+      const strand = kind === 0 ? 0 : Math.PI;
+      pos[i * 3] = Math.cos(angle + strand) * R + (Math.random() - 0.5) * 0.06;
+      pos[i * 3 + 1] = y;
+      pos[i * 3 + 2] = Math.sin(angle + strand) * R + (Math.random() - 0.5) * 0.06;
+    } else if (kind < 4) {
+      // second passage des brins (densité)
+      const strand = kind === 2 ? 0 : Math.PI;
+      pos[i * 3] = Math.cos(angle + strand) * R;
+      pos[i * 3 + 1] = y;
+      pos[i * 3 + 2] = Math.sin(angle + strand) * R;
+    } else {
+      // barreau entre les deux brins
+      const mix = Math.random();
+      pos[i * 3] = Math.cos(angle) * R * (1 - 2 * mix);
+      pos[i * 3 + 1] = y;
+      pos[i * 3 + 2] = Math.sin(angle) * R * (1 - 2 * mix);
+    }
+  }
+  return pos;
+}
+
+function genMatrix(PARTICLE_COUNT: number): Float32Array {
+  // Grille cubique de points — cube holographique
+  const pos = new Float32Array(PARTICLE_COUNT * 3);
+  const SIDE = Math.round(Math.cbrt(PARTICLE_COUNT));
+  const SPACING = 2.6 / SIDE;
+  let i = 0;
+  for (let x = 0; x < SIDE && i < PARTICLE_COUNT; x++)
+    for (let y = 0; y < SIDE && i < PARTICLE_COUNT; y++)
+      for (let z = 0; z < SIDE && i < PARTICLE_COUNT; z++, i++) {
+        pos[i * 3] = (x - SIDE / 2) * SPACING;
+        pos[i * 3 + 1] = (y - SIDE / 2) * SPACING;
+        pos[i * 3 + 2] = (z - SIDE / 2) * SPACING;
+      }
+  return pos;
+}
+
+function genVortex(PARTICLE_COUNT: number): Float32Array {
+  // Tourbillon conique — entonnoir de particules
+  const pos = new Float32Array(PARTICLE_COUNT * 3);
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    const t = Math.pow(Math.random(), 0.7);
+    const y = (t - 0.5) * 3.6;
+    const r = 0.15 + (1 - t) * 1.9 + (Math.random() - 0.5) * 0.15;
+    const theta = t * 14 + Math.random() * Math.PI * 2 * 0.12 + (i % 2) * Math.PI;
+    pos[i * 3] = Math.cos(theta) * r;
+    pos[i * 3 + 1] = y;
+    pos[i * 3 + 2] = Math.sin(theta) * r;
+  }
+  return pos;
+}
+
+const GENERATORS: Record<HoloStyle, (n: number) => Float32Array> = {
   sphere: genSphere,
   reactor: genReactor,
   galaxy: genGalaxy,
+  dna: genDna,
+  matrix: genMatrix,
+  vortex: genVortex,
 };
 
-function ParticleCloud({ style }: { style: HoloStyle }) {
+function ParticleCloud({ style, count, speedFactor }: { style: HoloStyle; count: number; speedFactor: number }) {
   const points = useRef<THREE.Points>(null);
   const material = useRef<THREE.PointsMaterial>(null);
   const freqBuf = useMemo(() => new Uint8Array(256), []);
   const color = useRef(new THREE.Color(statusColor("idle")));
 
-  const positions = useMemo(() => GENERATORS[style](), [style]);
+  const positions = useMemo(() => GENERATORS[style](count), [style, count]);
 
   useFrame(({ clock }) => {
     if (!points.current || !material.current) return;
     const status = useJarvisStore.getState().status;
     const t = clock.elapsedTime;
     const level = status === "speaking" ? readTtsLevel(freqBuf) : 0;
-    const speed = status === "processing" ? 0.5 : status === "listening" ? 0.25 : 0.1;
+    const speed =
+      (status === "processing" ? 0.5 : status === "listening" ? 0.25 : 0.1) * speedFactor;
 
     if (style === "reactor") {
       // Face caméra : rotation dans le plan écran uniquement
@@ -111,6 +181,15 @@ function ParticleCloud({ style }: { style: HoloStyle }) {
     } else if (style === "galaxy") {
       points.current.rotation.y = t * speed * 1.8;
       points.current.rotation.x = 0.5;                 // vue inclinée
+    } else if (style === "dna") {
+      points.current.rotation.y = t * speed * 2.2;
+      points.current.rotation.x = 0.12;
+    } else if (style === "matrix") {
+      points.current.rotation.y = t * speed * 0.9;
+      points.current.rotation.x = Math.sin(t * 0.15) * 0.35;
+    } else if (style === "vortex") {
+      points.current.rotation.y = t * speed * 3.0;
+      points.current.rotation.x = 0.1;
     } else {
       points.current.rotation.y = t * speed;
       points.current.rotation.x = Math.sin(t * 0.08) * 0.15;
@@ -126,7 +205,7 @@ function ParticleCloud({ style }: { style: HoloStyle }) {
 
   return (
     <points ref={points}>
-      <bufferGeometry key={style}>
+      <bufferGeometry key={`${style}-${count}`}>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
@@ -209,8 +288,14 @@ function CoreGlow({ intense }: { intense?: boolean }) {
  *  Remplit son conteneur parent (position: relative requis). */
 export function JarvisScene() {
   const holoStyle = useJarvisStore((s) => s.holoStyle);
-  // Re-render à chaque changement de thème (couleur lue dans useFrame)
+  const holoDensity = useJarvisStore((s) => s.holoDensity);
+  const holoSpeed = useJarvisStore((s) => s.holoSpeed);
+  // Re-render à chaque changement de couleur (lue dans useFrame)
   useJarvisStore((s) => s.theme);
+  useJarvisStore((s) => s.customAccent);
+
+  const count = DENSITY_COUNTS[holoDensity];
+  const speedFactor = SPEED_FACTORS[holoSpeed];
 
   return (
     <div className="absolute inset-0 pointer-events-none">
@@ -219,22 +304,28 @@ export function JarvisScene() {
         gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
         dpr={[1, 1.5]}
       >
-        <ParticleCloud key={holoStyle} style={holoStyle} />
+        <ParticleCloud
+          key={`${holoStyle}-${count}`}
+          style={holoStyle}
+          count={count}
+          speedFactor={speedFactor}
+        />
         {holoStyle === "sphere" && (
           <>
-            <OrbitalRing radius={2.05} tilt={Math.PI / 2.6} speed={0.3} />
-            <OrbitalRing radius={2.35} tilt={-Math.PI / 3.2} speed={-0.18} />
-            <OrbitalRing radius={2.7} tilt={Math.PI / 5} speed={0.1} />
+            <OrbitalRing radius={2.05} tilt={Math.PI / 2.6} speed={0.3 * speedFactor} />
+            <OrbitalRing radius={2.35} tilt={-Math.PI / 3.2} speed={-0.18 * speedFactor} />
+            <OrbitalRing radius={2.7} tilt={Math.PI / 5} speed={0.1 * speedFactor} />
             <CoreGlow />
           </>
         )}
         {holoStyle === "reactor" && (
           <>
-            <OrbitalRing radius={2.45} tilt={0} speed={-0.35} />
+            <OrbitalRing radius={2.45} tilt={0} speed={-0.35 * speedFactor} />
             <CoreGlow intense />
           </>
         )}
-        {holoStyle === "galaxy" && <CoreGlow intense />}
+        {(holoStyle === "galaxy" || holoStyle === "vortex") && <CoreGlow intense />}
+        {holoStyle === "dna" && <CoreGlow />}
       </Canvas>
     </div>
   );

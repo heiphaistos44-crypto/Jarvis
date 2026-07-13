@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Gauge, Loader2, Zap, Scale, Leaf } from "lucide-react";
+import { Gauge, Loader2, Zap, Scale, Leaf, ShieldCheck } from "lucide-react";
+import { useJarvisStore } from "../../stores/jarvisStore";
 
 const API = "http://127.0.0.1:8765/api/performance";
 
@@ -20,6 +21,15 @@ export function PerfTab() {
   const [active, setActive] = useState("");
   const [reloading, setReloading] = useState(false);
   const [error, setError] = useState("");
+  const perfActive = useJarvisStore((s) => s.perfActive);
+
+  // Le serveur confirme (ou rétrograde via protocole matériel) → sync UI
+  useEffect(() => {
+    if (perfActive) {
+      setActive(perfActive);
+      setReloading(false);
+    }
+  }, [perfActive]);
 
   useEffect(() => {
     fetch(API)
@@ -60,6 +70,15 @@ export function PerfTab() {
       <div className="flex items-center gap-2 text-[9px] text-blue-400/50">
         <Gauge size={12} className="text-cyan-400" />
         Le changement recharge les modèles (~30-60 s). JARVIS reste accessible pendant l'opération.
+      </div>
+      <div className="flex items-start gap-2 p-2.5 rounded-lg text-[9px] text-blue-400/50"
+        style={{ background: "rgba(0,255,136,0.05)", border: "1px solid rgba(0,255,136,0.15)" }}>
+        <ShieldCheck size={13} className="text-green-400 shrink-0 mt-0.5" />
+        <span>
+          <span className="text-green-400 font-bold">Protocole matériel actif</span> — démarrage
+          toujours en Économie, VRAM plafonnée à 80 % : en cas de dépassement soutenu, le profil
+          est rétrogradé automatiquement pour protéger votre carte graphique.
+        </span>
       </div>
 
       {error && <div className="text-[9px] text-red-400 px-1">{error}</div>}
