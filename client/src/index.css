@@ -11,7 +11,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: radial-gradient(ellipse 120% 90% at 50% -10%, #06182e 0%, var(--jarvis-dark) 55%, #01060e 100%);
+  background: radial-gradient(ellipse 120% 90% at 50% -10%, #0a2140 0%, #041228 55%, #020a16 100%);
   color: #e0f4ff;
   font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
   overflow: hidden;
@@ -26,21 +26,21 @@ code, pre, .font-mono {
 
 /* Panneau verre dépoli — laisse transparaître l'hologramme 3D derrière */
 .glass-panel {
-  background: linear-gradient(165deg, rgba(8, 26, 50, 0.52), rgba(2, 10, 24, 0.62));
-  border: 1px solid rgba(0, 212, 255, 0.12);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  background: linear-gradient(165deg, rgba(16, 44, 80, 0.44), rgba(6, 20, 42, 0.52));
+  border: 1px solid rgba(0, 212, 255, 0.18);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
   box-shadow:
-    0 10px 44px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 0 60px rgba(0, 212, 255, 0.025);
+    0 10px 44px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 60px rgba(0, 212, 255, 0.04);
 }
 
 .glass-subtle {
-  background: linear-gradient(165deg, rgba(8, 26, 50, 0.38), rgba(2, 10, 24, 0.46));
-  border: 1px solid rgba(0, 212, 255, 0.10);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  background: linear-gradient(165deg, rgba(16, 44, 80, 0.34), rgba(6, 20, 42, 0.4));
+  border: 1px solid rgba(0, 212, 255, 0.14);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }

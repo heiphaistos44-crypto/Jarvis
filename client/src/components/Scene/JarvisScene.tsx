@@ -62,7 +62,7 @@ function ParticleSphere() {
 
     color.current.lerp(new THREE.Color(STATUS_COLORS[status]), 0.06);
     material.current.color.copy(color.current);
-    material.current.opacity = status === "standby" ? 0.35 : 0.75 + level * 0.25;
+    material.current.opacity = status === "standby" ? 0.45 : 0.9 + level * 0.1;
   });
 
   return (
@@ -72,9 +72,9 @@ function ParticleSphere() {
       </bufferGeometry>
       <pointsMaterial
         ref={material}
-        size={0.016}
+        size={0.022}
         transparent
-        opacity={0.75}
+        opacity={0.9}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
         sizeAttenuation
@@ -104,7 +104,7 @@ function OrbitalRing({ radius, tilt, speed }: { radius: number; tilt: number; sp
           <meshBasicMaterial
             ref={material}
             transparent
-            opacity={0.35}
+            opacity={0.55}
             blending={THREE.AdditiveBlending}
           />
         </mesh>
@@ -153,7 +153,7 @@ export function JarvisScene() {
   return (
     <div className="absolute inset-0 pointer-events-none">
       <Canvas
-        camera={{ position: [0, 0, 4.0], fov: 52 }}
+        camera={{ position: [0, 0, 5.0], fov: 48 }}
         gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
         dpr={[1, 1.5]}
       >

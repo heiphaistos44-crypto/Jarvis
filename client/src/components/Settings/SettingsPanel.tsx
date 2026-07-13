@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings, X, Volume2, VolumeX, Mic, Globe, Mail, CheckCircle, AlertCircle, Upload, Cpu, Ear } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -124,9 +125,11 @@ export function SettingsPanel() {
         <Settings size={14} />
       </motion.button>
 
+      {createPortal(
       <AnimatePresence>
         {open && (
-          /* Single full-screen container: backdrop click closes, inner panel stops propagation */
+          /* Portal vers body : le backdrop-filter du header (glass) créerait
+             sinon un containing block qui piège cette modale `fixed` en haut */
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -417,7 +420,8 @@ export function SettingsPanel() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body)}
     </>
   );
 }
