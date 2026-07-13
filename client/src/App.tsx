@@ -13,7 +13,7 @@ const JarvisScene = lazy(() =>
   import("./components/Scene/JarvisScene").then((m) => ({ default: m.JarvisScene }))
 );
 import { AgentSteps } from "./components/AgentSteps/AgentSteps";
-import { useJarvisStore } from "./stores/jarvisStore";
+import { useJarvisStore, THEMES } from "./stores/jarvisStore";
 import type { JarvisStatus } from "./types";
 
 function HexGrid() {
@@ -145,8 +145,9 @@ function LeftPanel() {
       .catch(() => {});
   }, [isConnected]);
 
+  const theme = useJarvisStore((s) => s.theme);
   const statusColors: Record<JarvisStatus, string> = {
-    idle: "#00d4ff",
+    idle: THEMES[theme].accent,
     standby: "#3388cc",
     listening: "#00ff88",
     processing: "#ffaa00",
@@ -427,7 +428,7 @@ function Header() {
           <span ref={timeRef} />
         </span>
         <div className="w-px h-3 bg-cyan-900/40" />
-        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.4.0</span>
+        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.5.0</span>
         <div className="w-px h-3 bg-cyan-900/40" />
         <SettingsPanel />
         <div className="w-px h-3 bg-cyan-900/40" />
@@ -448,6 +449,7 @@ function ChatAreaFrame() {
 }
 
 export default function App() {
+  const layoutSide = useJarvisStore((s) => s.layoutSide);
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -479,7 +481,7 @@ export default function App() {
 
       <Header />
 
-      <div className="flex-1 flex overflow-hidden relative z-10 gap-3 px-3 pb-3 pt-1">
+      <div className={`flex-1 flex overflow-hidden relative z-10 gap-3 px-3 pb-3 pt-1 ${layoutSide === "right" ? "flex-row-reverse" : ""}`}>
         <LeftPanel />
 
         <div className="flex-1 flex flex-col relative glass-panel rounded-2xl overflow-hidden">

@@ -54,7 +54,11 @@ async def _agent_loop(
 ) -> str:
     """Boucle agent : LLM → tool → LLM → ... → réponse finale (max 5 itérations)."""
     accumulated = ""
-    max_tokens = 512 if providers.tier == "local" else 1024
+    if providers.tier == "local":
+        from utils.perf import active_profile
+        max_tokens = active_profile().max_tokens
+    else:
+        max_tokens = 1024
     used_tools = False
     lesson_recorded = False
     user_query = next(

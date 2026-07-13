@@ -37,6 +37,13 @@ from api.websocket import websocket_handler
 
 logger = get_logger("main")
 
+# Profil de performance persisté — appliqué avant le chargement des modèles
+from utils.perf import load_profile as _load_perf, active_profile as _active_perf
+_perf = _load_perf()
+settings.n_gpu_layers = _perf.n_gpu_layers
+settings.n_ctx = _perf.n_ctx
+settings.whisper_compute_type = _perf.whisper_compute
+
 llm = LLMManager(settings)
 stt = STTManager(settings)
 tts = TTSManager(settings)
@@ -77,6 +84,37 @@ async def _load_models_background() -> None:
     })
 
 
+_reload_lock = asyncio.Lock()
+
+
+async def apply_performance_profile() -> None:
+    """Recharge LLM + STT avec le profil actif (30-60 s, en arrière-plan)."""
+    async with _reload_lock:
+        profile = _active_perf()
+        logger.info(f"Rechargement des modèles — profil {profile.label}...")
+        settings.n_gpu_layers = profile.n_gpu_layers
+        settings.n_ctx = profile.n_ctx
+        settings.whisper_compute_type = profile.whisper_compute
+        llm.unload()
+        stt.unload()
+        await asyncio.to_thread(llm.load)
+        await asyncio.to_thread(stt.load)
+        if providers.tier == "local" and llm.is_available:
+            from core.prompt import build_system_prompt
+            await llm.warmup(build_system_prompt("local", "", stable=True))
+        from core.monitor import broadcast_direct as _bd
+        _bd("server_status", {
+            "llm": providers.is_available,
+            "stt": stt.is_available,
+            "tts": tts.is_available,
+            "provider": providers.active.name,
+            "providerLabel": providers.active.label,
+            "providerModel": providers.active.model,
+        })
+        _bd("notice", {"message": f"Profil {profile.label} appliqué — modèles rechargés."})
+        logger.info(f"Profil {profile.label} appliqué")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Démarrage JARVIS Core...")
@@ -95,7 +133,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("JARVIS arrêté.")
 
 
-app = FastAPI(title="JARVIS Core", version="4.4.0", lifespan=lifespan)
+app = FastAPI(title="JARVIS Core", version="4.5.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:1420", "http://127.0.0.1:1420", "tauri://localhost"],

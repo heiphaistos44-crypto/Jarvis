@@ -59,12 +59,66 @@ function buildJarvisChain(ctx: AudioContext): AudioNode {
   hp.connect(presence);
   presence.connect(shelf);
   shelf.connect(comp);
+
+  let tail: AudioNode = comp;
+
+  // ── Effet « armure » façon film : le timbre JARVIS d'Iron Man vient
+  // surtout du traitement haut-parleur — résonances métalliques (combs très
+  // courts) + bande passante resserrée, mixées sous le signal clair.
+  if (useJarvisStore.getState().armorFx) {
+    const bandLow = ctx.createBiquadFilter();
+    bandLow.type = "highpass";
+    bandLow.frequency.value = 280;
+    const bandHigh = ctx.createBiquadFilter();
+    bandHigh.type = "lowpass";
+    bandHigh.frequency.value = 6200;
+    const metal1 = ctx.createDelay(0.05);
+    metal1.delayTime.value = 0.009;
+    const fb1 = ctx.createGain();
+    fb1.gain.value = 0.32;
+    metal1.connect(fb1).connect(metal1);
+    const metal2 = ctx.createDelay(0.05);
+    metal2.delayTime.value = 0.0135;
+    const fb2 = ctx.createGain();
+    fb2.gain.value = 0.24;
+    metal2.connect(fb2).connect(metal2);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.4;
+    const dry = ctx.createGain();
+    dry.gain.value = 0.78;
+    const mix = ctx.createGain();
+
+    comp.connect(dry).connect(mix);
+    comp.connect(bandLow);
+    bandLow.connect(bandHigh);
+    bandHigh.connect(metal1).connect(wet);
+    bandHigh.connect(metal2).connect(wet);
+    wet.connect(mix);
+    tail = mix;
+  }
+
   if (ttsAnalyser) {
-    comp.connect(ttsAnalyser);
+    tail.connect(ttsAnalyser);
   } else {
-    comp.connect(ctx.destination);
+    tail.connect(ctx.destination);
   }
   return hp; // chain entry point
+}
+
+// ── Thèmes esthétiques ───────────────────────────────────────────────────────
+export type ThemeName = "arctic" | "mark3" | "emerald" | "amethyst";
+export type HoloStyle = "sphere" | "reactor" | "galaxy";
+
+export const THEMES: Record<ThemeName, { label: string; accent: string; accentSoft: string }> = {
+  arctic:   { label: "Arctic (classique)", accent: "#00d4ff", accentSoft: "#0088aa" },
+  mark3:    { label: "Mark III (rouge & or)", accent: "#ffb340", accentSoft: "#cc4422" },
+  emerald:  { label: "Émeraude", accent: "#00ff9d", accentSoft: "#00aa66" },
+  amethyst: { label: "Améthyste", accent: "#b388ff", accentSoft: "#7744cc" },
+};
+
+function _stored<T extends string>(key: string, valid: readonly T[], fallback: T): T {
+  const v = localStorage.getItem(key);
+  return v && (valid as readonly string[]).includes(v) ? (v as T) : fallback;
 }
 
 const MALE_VOICES = new Set([
@@ -190,6 +244,14 @@ interface JarvisState {
   metrics: { cpu: number; ram: number; gpu: number | null; vram: number | null };
   sendQuery: (text: string) => void;
   stopGeneration: () => void;
+  armorFx: boolean;
+  setArmorFx: (v: boolean) => void;
+  theme: ThemeName;
+  setTheme: (t: ThemeName) => void;
+  holoStyle: HoloStyle;
+  setHoloStyle: (h: HoloStyle) => void;
+  layoutSide: "left" | "right";
+  setLayoutSide: (s: "left" | "right") => void;
 
   setStatus: (status: JarvisStatus) => void;
   setConnected: (v: boolean) => void;
@@ -239,6 +301,26 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
     set({ councilEnabled });
   },
   metrics: { cpu: 0, ram: 0, gpu: null, vram: null },
+  armorFx: localStorage.getItem("jarvis_armor_fx") !== "0",
+  setArmorFx: (armorFx) => {
+    localStorage.setItem("jarvis_armor_fx", armorFx ? "1" : "0");
+    set({ armorFx });
+  },
+  theme: _stored("jarvis_theme", ["arctic", "mark3", "emerald", "amethyst"] as const, "arctic"),
+  setTheme: (theme) => {
+    localStorage.setItem("jarvis_theme", theme);
+    set({ theme });
+  },
+  holoStyle: _stored("jarvis_holo", ["sphere", "reactor", "galaxy"] as const, "sphere"),
+  setHoloStyle: (holoStyle) => {
+    localStorage.setItem("jarvis_holo", holoStyle);
+    set({ holoStyle });
+  },
+  layoutSide: _stored("jarvis_layout", ["left", "right"] as const, "left"),
+  setLayoutSide: (layoutSide) => {
+    localStorage.setItem("jarvis_layout", layoutSide);
+    set({ layoutSide });
+  },
 
   sendQuery: (text) => {
     const { wsSend, addMessage, councilEnabled } = get();

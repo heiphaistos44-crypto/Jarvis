@@ -43,6 +43,9 @@ class STTManager:
         except Exception as e:
             logger.warning(f"STT non disponible: {e}")
 
+    def unload(self) -> None:
+        self._model = None
+
     @property
     def is_available(self) -> bool:
         return self._model is not None

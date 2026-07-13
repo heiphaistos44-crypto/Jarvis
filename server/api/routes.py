@@ -37,7 +37,7 @@ class GmailStatusResponse(BaseModel):
 
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
-    return HealthResponse(status="ok", version="4.4.0")
+    return HealthResponse(status="ok", version="4.5.0")
 
 
 @router.get("/memories/count")
@@ -63,6 +63,29 @@ async def list_voices() -> VoicesResponse:
 async def system_info() -> SystemInfoResponse:
     info = await asyncio.to_thread(get_system_info)
     return SystemInfoResponse(info=info)
+
+# ── Performance ─────────────────────────────────────────────────────────────
+
+class PerfRequest(BaseModel):
+    profile: str
+
+
+@router.get("/performance")
+async def performance_status() -> dict:
+    from utils.perf import status as perf_status
+    return perf_status()
+
+
+@router.post("/performance")
+async def performance_set(req: PerfRequest) -> dict:
+    """Change le profil et recharge les modèles en arrière-plan (~30-60 s)."""
+    from utils.perf import set_profile, status as perf_status
+    if set_profile(req.profile) is None:
+        raise HTTPException(status_code=400, detail=f"Profil inconnu: {req.profile}")
+    import main  # lazy — évite l'import circulaire, main est déjà chargé
+    asyncio.create_task(main.apply_performance_profile())
+    return {**perf_status(), "reloading": True}
+
 
 # ── Providers LLM ───────────────────────────────────────────────────────────
 

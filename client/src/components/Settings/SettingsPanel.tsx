@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, X, Volume2, VolumeX, Mic, Globe, Mail, CheckCircle, AlertCircle, Upload, Cpu, Ear } from "lucide-react";
+import { Settings, X, Volume2, VolumeX, Mic, Globe, Mail, CheckCircle, AlertCircle, Upload, Cpu, Ear, Gauge, Palette, Shield } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useJarvisStore } from "../../stores/jarvisStore";
 import { ProvidersTab } from "./ProvidersTab";
+import { PerfTab } from "./PerfTab";
+import { ThemeTab } from "./ThemeTab";
 
 interface VoiceOption {
   id: string;
@@ -23,7 +25,7 @@ type GmailStatus = "loading" | "non_configured" | "not_authenticated" | "connect
 
 export function SettingsPanel() {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"voice" | "brain" | "services">("voice");
+  const [activeTab, setActiveTab] = useState<"voice" | "brain" | "perf" | "theme" | "services">("voice");
 
   const ttsEnabled = useJarvisStore((s) => s.ttsEnabled);
   const selectedVoice = useJarvisStore((s) => s.selectedVoice);
@@ -32,6 +34,8 @@ export function SettingsPanel() {
   const wakeWordEnabled = useJarvisStore((s) => s.wakeWordEnabled);
   const wakeWordAvailable = useJarvisStore((s) => s.wakeWordAvailable);
   const setWakeWordEnabled = useJarvisStore((s) => s.setWakeWordEnabled);
+  const armorFx = useJarvisStore((s) => s.armorFx);
+  const setArmorFx = useJarvisStore((s) => s.setArmorFx);
   const wsSend = useJarvisStore((s) => s.wsSend);
   const [availableVoices, setAvailableVoices] = useState<string[]>([]);
 
@@ -110,6 +114,8 @@ export function SettingsPanel() {
   const tabs = [
     { id: "voice" as const, label: "VOIX", icon: <Volume2 size={11} /> },
     { id: "brain" as const, label: "CERVEAU", icon: <Cpu size={11} /> },
+    { id: "perf" as const, label: "PERF", icon: <Gauge size={11} /> },
+    { id: "theme" as const, label: "THÈME", icon: <Palette size={11} /> },
     { id: "services" as const, label: "SERVICES", icon: <Globe size={11} /> },
   ];
 
@@ -258,6 +264,37 @@ export function SettingsPanel() {
                         </div>
                       </div>
 
+                      {/* Effet armure façon film */}
+                      <div className="flex flex-col gap-2 pt-1 border-t border-cyan-900/20">
+                        <div className="text-[9px] tracking-widest text-blue-400/40">EFFET « ARMURE » (TIMBRE DU FILM)</div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Shield size={14} className={armorFx ? "text-cyan-400" : "text-blue-400/40"} />
+                            <span className="text-xs text-cyan-100/70">
+                              {armorFx ? "Résonance métallique active" : "Voix naturelle sans traitement"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setArmorFx(!armorFx)}
+                            className="relative w-10 h-5 rounded-full transition-all"
+                            style={{
+                              background: armorFx ? "rgba(0,212,255,0.3)" : "rgba(255,255,255,0.05)",
+                              border: `1px solid ${armorFx ? "rgba(0,212,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+                            }}
+                          >
+                            <motion.div
+                              animate={{ x: armorFx ? 20 : 2 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                              className="absolute top-0.5 w-4 h-4 rounded-full"
+                              style={{ background: armorFx ? "#00d4ff" : "#ffffff22", boxShadow: armorFx ? "0 0 8px #00d4ff" : "none" }}
+                            />
+                          </button>
+                        </div>
+                        <p className="text-[8px] text-blue-400/25 leading-relaxed">
+                          Reproduit le traitement haut-parleur de l'IA du film : résonances métalliques et bande passante resserrée, mixées sous la voix claire.
+                        </p>
+                      </div>
+
                       {/* Wake word toggle */}
                       <div className="flex flex-col gap-2 pt-1 border-t border-cyan-900/20">
                         <div className="text-[9px] tracking-widest text-blue-400/40">WAKE WORD « HEY JARVIS »</div>
@@ -307,6 +344,12 @@ export function SettingsPanel() {
 
                   {/* ── BRAIN TAB ── */}
                   {activeTab === "brain" && <ProvidersTab />}
+
+                  {/* ── PERF TAB ── */}
+                  {activeTab === "perf" && <PerfTab />}
+
+                  {/* ── THEME TAB ── */}
+                  {activeTab === "theme" && <ThemeTab />}
 
                   {/* ── SERVICES TAB ── */}
                   {activeTab === "services" && (
