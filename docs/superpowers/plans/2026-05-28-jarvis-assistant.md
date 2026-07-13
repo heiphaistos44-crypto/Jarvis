@@ -1,4 +1,4 @@
-# J.A.R.V.I.S. — Implementation Plan
+﻿# J.A.R.V.I.S. — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -109,7 +109,7 @@ C:\Users\Momo\Documents\Jarvis\
 ```powershell
 cd "C:\Users\Momo\Documents\Jarvis"
 git init
-git remote add origin https://github.com/heiphaistos44-crypto/Jarvis.git
+git remote add origin https://github.com/Heiphaistos/Jarvis.git
 ```
 
 - [ ] **Step 2: Créer .gitignore**
@@ -2104,7 +2104,7 @@ git push -u origin main
 
 ```powershell
 # 1. Cloner le repo
-git clone https://github.com/heiphaistos44-crypto/Jarvis.git
+git clone https://github.com/Heiphaistos/Jarvis.git
 cd Jarvis
 
 # 2. Setup (installe deps + télécharge modèle ~4.4 GB)
