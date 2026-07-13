@@ -187,6 +187,9 @@ interface JarvisState {
   wakeDetected: boolean;
   councilEnabled: boolean;
   setCouncilEnabled: (v: boolean) => void;
+  metrics: { cpu: number; ram: number; gpu: number | null; vram: number | null };
+  sendQuery: (text: string) => void;
+  stopGeneration: () => void;
 
   setStatus: (status: JarvisStatus) => void;
   setConnected: (v: boolean) => void;
@@ -234,6 +237,24 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   setCouncilEnabled: (councilEnabled) => {
     localStorage.setItem("jarvis_council", councilEnabled ? "1" : "0");
     set({ councilEnabled });
+  },
+  metrics: { cpu: 0, ram: 0, gpu: null, vram: null },
+
+  sendQuery: (text) => {
+    const { wsSend, addMessage, councilEnabled } = get();
+    if (!text.trim() || !wsSend) return;
+    addMessage({
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text,
+      timestamp: Date.now(),
+    });
+    wsSend({ type: "text_query", payload: { text, council: councilEnabled } });
+  },
+
+  stopGeneration: () => {
+    clearTtsQueue();
+    get().wsSend?.({ type: "stop_generation", payload: {} });
   },
   setConnected: (isConnected) => {
     if (!isConnected) clearTtsQueue();
@@ -427,6 +448,10 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
             ? { providerModel: event.payload.providerModel }
             : {}),
         });
+        break;
+
+      case "system_metrics":
+        set({ metrics: event.payload });
         break;
 
       case "system_alert": {

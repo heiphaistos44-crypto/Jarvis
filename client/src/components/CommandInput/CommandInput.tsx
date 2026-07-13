@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Mic, MicOff, Send, Zap, CheckCircle, Network } from "lucide-react";
+import { Mic, MicOff, Send, Zap, CheckCircle, Network, Square, Activity, CloudSun, Clock, Camera } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useJarvis } from "../../hooks/useJarvis";
 import { useJarvisStore } from "../../stores/jarvisStore";
@@ -14,7 +14,17 @@ export function CommandInput() {
   const addMessage = useJarvisStore((s) => s.addMessage);
   const councilEnabled = useJarvisStore((s) => s.councilEnabled);
   const setCouncilEnabled = useJarvisStore((s) => s.setCouncilEnabled);
-  const isDisabled = !isConnected || status === "processing" || status === "speaking";
+  const sendQuery = useJarvisStore((s) => s.sendQuery);
+  const stopGeneration = useJarvisStore((s) => s.stopGeneration);
+  const isBusy = status === "processing" || status === "speaking";
+  const isDisabled = !isConnected || isBusy;
+
+  const QUICK_ACTIONS = [
+    { icon: Activity, label: "Diagnostic", query: "Fais un diagnostic complet du système" },
+    { icon: CloudSun, label: "Météo", query: "Quelle est la météo à Paris ?" },
+    { icon: Clock, label: "Heure", query: "Quelle heure est-il ?" },
+    { icon: Camera, label: "Capture", query: "Prends une capture d'écran" },
+  ];
 
   const handleSubmit = useCallback(() => {
     if (!text.trim() || isDisabled) return;
@@ -45,9 +55,9 @@ export function CommandInput() {
       {/* Top separator line */}
       <div className="absolute top-0 left-4 right-4 h-px" style={{ background: "linear-gradient(90deg, transparent, #00d4ff33, transparent)" }} />
 
-      {/* Processing indicator */}
+      {/* Processing indicator + STOP */}
       <AnimatePresence>
-        {isDisabled && (
+        {isBusy && (
           <motion.div
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
@@ -62,6 +72,51 @@ export function CommandInput() {
               className="flex-1 h-px"
               style={{ background: "linear-gradient(90deg, #ffaa0033, transparent)" }}
             />
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={stopGeneration}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] tracking-widest font-bold"
+              style={{
+                color: "#ff6666",
+                background: "rgba(255,80,80,0.08)",
+                border: "1px solid rgba(255,80,80,0.3)",
+              }}
+              title="Interrompre JARVIS"
+            >
+              <Square size={9} fill="currentColor" />
+              STOP
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Actions rapides */}
+      <AnimatePresence>
+        {!isBusy && isConnected && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-1.5 mb-2 px-1"
+          >
+            {QUICK_ACTIONS.map(({ icon: Icon, label, query }) => (
+              <motion.button
+                key={label}
+                whileHover={{ scale: 1.04, y: -1 }}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => sendQuery(query)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] tracking-wider transition-colors"
+                style={{
+                  color: "#7dd3fc99",
+                  background: "rgba(0,120,190,0.07)",
+                  border: "1px solid rgba(0,212,255,0.12)",
+                }}
+              >
+                <Icon size={10} />
+                {label}
+              </motion.button>
+            ))}
           </motion.div>
         )}
       </AnimatePresence>

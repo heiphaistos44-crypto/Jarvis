@@ -4,11 +4,20 @@ import { useJarvisStore } from "../../stores/jarvisStore";
 import { Message } from "./Message";
 import { TypingIndicator } from "./TypingIndicator";
 
+const SUGGESTIONS = [
+  "Comment va mon système ?",
+  "Quelle est la météo à Paris ?",
+  "Explique-moi le fonctionnement d'un réacteur à fusion",
+  "Souviens-toi que je préfère les réponses courtes",
+];
+
 export function ChatPanel() {
   const messages = useJarvisStore((s) => s.messages);
   const pendingMessageId = useJarvisStore((s) => s.pendingMessageId);
   const status = useJarvisStore((s) => s.status);
   const exportConversation = useJarvisStore((s) => s.exportConversation);
+  const sendQuery = useJarvisStore((s) => s.sendQuery);
+  const isConnected = useJarvisStore((s) => s.isConnected);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,19 +32,35 @@ export function ChatPanel() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-3 pointer-events-none"
+            className="absolute inset-0 flex flex-col items-center justify-center gap-5"
           >
-            <div className="text-[10px] text-blue-400/25 tracking-[0.4em] text-center">
-              ── SYSTÈME EN ATTENTE DE COMMANDE ──
+            <div className="text-center">
+              <div className="text-lg font-light text-cyan-100/70 mb-1">
+                Bonsoir, Monsieur.
+              </div>
+              <div className="text-[11px] text-blue-400/40 tracking-wide">
+                Que puis-je faire pour vous ?
+              </div>
             </div>
-            <div className="flex gap-1">
-              {[0, 1, 2].map((i) => (
-                <motion.div
-                  key={i}
-                  className="w-1 h-1 rounded-full bg-cyan-400/20"
-                  animate={{ opacity: [0.2, 0.8, 0.2] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
-                />
+            <div className="flex flex-col gap-2 w-full max-w-sm px-6">
+              {SUGGESTIONS.map((s, i) => (
+                <motion.button
+                  key={s}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 + i * 0.08 }}
+                  whileHover={{ scale: 1.02, x: 3 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={!isConnected}
+                  onClick={() => sendQuery(s)}
+                  className="text-left px-4 py-2.5 rounded-xl text-[12px] text-cyan-100/60 hover:text-cyan-100 transition-colors disabled:opacity-30"
+                  style={{
+                    background: "rgba(0,120,190,0.06)",
+                    border: "1px solid rgba(0,212,255,0.1)",
+                  }}
+                >
+                  {s}
+                </motion.button>
               ))}
             </div>
           </motion.div>

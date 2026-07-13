@@ -240,8 +240,10 @@ class LLMManager:
         # La génération llama-cpp est synchrone : elle tourne entièrement dans
         # un thread et pousse les tokens dans une queue asyncio. L'event loop
         # reste libre (pings WebSocket, autres clients) pendant l'inférence.
+        import threading
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[str | None | Exception] = asyncio.Queue()
+        stop_event = threading.Event()  # STOP utilisateur → coupe entre 2 tokens
 
         def _generate_worker() -> None:
             try:
@@ -256,6 +258,8 @@ class LLMManager:
                     stream=True,
                 )
                 for chunk in gen:
+                    if stop_event.is_set():
+                        break
                     delta = chunk["choices"][0]["delta"]
                     if content := delta.get("content"):
                         loop.call_soon_threadsafe(queue.put_nowait, content)
@@ -276,4 +280,7 @@ class LLMManager:
                         break
                     yield item
             finally:
+                # Annulation (STOP) : signale le worker, qui s'arrête au token
+                # suivant (~25 ms) — le lock reste tenu jusqu'à sa sortie propre.
+                stop_event.set()
                 await worker

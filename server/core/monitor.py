@@ -63,7 +63,7 @@ async def _broadcast(alert_type: str, message: str) -> None:
 
 
 async def _check_resources() -> None:
-    cpu = psutil.cpu_percent(interval=1)
+    cpu = psutil.cpu_percent(interval=None)
     ram = psutil.virtual_memory()
 
     if cpu > CPU_WARN_PCT:
@@ -92,13 +92,53 @@ async def _check_resources() -> None:
             pass
 
 
+def _gpu_stats() -> tuple[float, float] | None:
+    """(utilisation %, VRAM %) via nvidia-smi, ou None sans GPU NVIDIA."""
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=3,
+            creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+        if proc.returncode != 0:
+            return None
+        parts = proc.stdout.strip().split("\n")[0].split(",")
+        util = float(parts[0])
+        vram = float(parts[1]) / float(parts[2]) * 100
+        return util, vram
+    except Exception:
+        return None
+
+
+async def _push_metrics() -> None:
+    """Métriques temps réel (CPU/RAM/GPU) poussées au HUD toutes les 3 s."""
+    cpu = psutil.cpu_percent(interval=None)
+    ram = psutil.virtual_memory().percent
+    gpu = await asyncio.to_thread(_gpu_stats)
+    broadcast_direct("system_metrics", {
+        "cpu": round(cpu, 1),
+        "ram": round(ram, 1),
+        "gpu": round(gpu[0], 1) if gpu else None,
+        "vram": round(gpu[1], 1) if gpu else None,
+    })
+
+
 async def run_monitor() -> None:
-    """Tâche asyncio background — surveille CPU/RAM/disque toutes les 30s."""
+    """Tâche asyncio background — métriques HUD (3 s) + alertes (30 s)."""
     logger.info("Moniteur système démarré")
+    psutil.cpu_percent(interval=None)  # amorce la mesure non bloquante
+    tick = 0
     while True:
         try:
-            await asyncio.sleep(CHECK_INTERVAL)
-            await _check_resources()
+            await asyncio.sleep(3)
+            tick += 3
+            if _subscribers:
+                await _push_metrics()
+            if tick >= CHECK_INTERVAL:
+                tick = 0
+                await _check_resources()
         except asyncio.CancelledError:
             logger.info("Moniteur système arrêté")
             break

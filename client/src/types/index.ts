@@ -72,13 +72,18 @@ export type ServerEvent =
         providerModel?: string;
       };
     }
-  | { type: "system_alert"; payload: { alert_type: string; message: string } };
+  | { type: "system_alert"; payload: { alert_type: string; message: string } }
+  | {
+      type: "system_metrics";
+      payload: { cpu: number; ram: number; gpu: number | null; vram: number | null };
+    };
 
 export type ClientEvent =
   | { type: "text_query"; payload: { text: string; council?: boolean } }
   | { type: "audio_chunk"; payload: AudioChunk }
   | { type: "wake_audio"; payload: AudioChunk }
   | { type: "wake_reset"; payload: Record<string, never> }
+  | { type: "stop_generation"; payload: Record<string, never> }
   | { type: "mic_stop"; payload: Record<string, never> }
   | { type: "tts_done"; payload: Record<string, never> }
   | { type: "set_tts"; payload: { enabled: boolean } }

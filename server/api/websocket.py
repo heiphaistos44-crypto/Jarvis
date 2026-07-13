@@ -508,6 +508,27 @@ async def websocket_handler(
     current_sample_rate: int = 16000
     tts_enabled: bool = True
     wake_detector = None  # lazy — instancié au 1er wake_audio (modèle stateful par connexion)
+    query_task: asyncio.Task | None = None  # requête en cours — annulable via stop_generation
+
+    async def _run_query(coro) -> None:
+        """Exécute une requête en tâche de fond ; garantit le retour à idle
+        même sur annulation (bouton STOP) ou erreur."""
+        try:
+            await coro
+        except asyncio.CancelledError:
+            logger.info("Génération interrompue par Monsieur")
+            try:
+                await manager.send(ws, "notice", {"message": "Génération interrompue."})
+                await manager.send(ws, "status", {"status": "idle"})
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error(f"Erreur requête: {e}", exc_info=True)
+            try:
+                await manager.send(ws, "error", {"message": "Erreur interne du serveur."})
+                await manager.send(ws, "status", {"status": "idle"})
+            except Exception:
+                pass
 
     try:
         while True:
@@ -530,10 +551,20 @@ async def websocket_handler(
                     continue
                 text = text[:MAX_TEXT_CHARS]
                 council = bool(payload.get("council", False))
+                # Une seule requête à la fois — la nouvelle remplace l'ancienne
+                if query_task is not None and not query_task.done():
+                    query_task.cancel()
                 if council and len(providers.council_members()) >= 2:
-                    await handle_council_query(ws, text, providers, memory, tts, tts_enabled)
+                    coro = handle_council_query(ws, text, providers, memory, tts, tts_enabled)
                 else:
-                    await handle_text_query(ws, text, providers, memory, tts, tools, tts_enabled)
+                    coro = handle_text_query(ws, text, providers, memory, tts, tools, tts_enabled)
+                query_task = asyncio.create_task(_run_query(coro))
+
+            elif event_type == "stop_generation":
+                if query_task is not None and not query_task.done():
+                    query_task.cancel()
+                else:
+                    await manager.send(ws, "status", {"status": "idle"})
 
             elif event_type == "audio_chunk":
                 if not _rate_limiter.allow_audio(ws_id):
@@ -549,11 +580,11 @@ async def websocket_handler(
                     if len(audio_buffer) >= CHUNK_THRESHOLD:
                         chunks = list(audio_buffer)
                         audio_buffer.clear()
-                        await transcribe_and_query(
+                        if query_task is not None and not query_task.done():
+                            query_task.cancel()
+                        query_task = asyncio.create_task(_run_query(transcribe_and_query(
                             ws, chunks, current_sample_rate, stt, providers, memory, tts, tools, tts_enabled
-                        )
-                        if stt.is_available:
-                            await manager.send(ws, "status", {"status": "listening"})
+                        )))
 
             elif event_type == "wake_audio":
                 # Mode veille : frames analysées pour « Hey Jarvis » uniquement,
@@ -581,9 +612,11 @@ async def websocket_handler(
                 if audio_buffer and stt.is_available:
                     chunks = list(audio_buffer)
                     audio_buffer.clear()
-                    await transcribe_and_query(
+                    if query_task is not None and not query_task.done():
+                        query_task.cancel()
+                    query_task = asyncio.create_task(_run_query(transcribe_and_query(
                         ws, chunks, current_sample_rate, stt, providers, memory, tts, tools, tts_enabled
-                    )
+                    )))
                 else:
                     audio_buffer.clear()
                     await manager.send(ws, "status", {"status": "idle"})
@@ -628,6 +661,8 @@ async def websocket_handler(
         except Exception:
             pass
     finally:
+        if query_task is not None and not query_task.done():
+            query_task.cancel()
         alert_task.cancel()
         _monitor_unsubscribe(alert_queue)
         _rate_limiter.cleanup(ws_id)

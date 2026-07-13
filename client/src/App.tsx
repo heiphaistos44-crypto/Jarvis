@@ -64,6 +64,27 @@ function Corner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
   );
 }
 
+function MetricBar({ label, value }: { label: string; value: number | null }) {
+  const pct = value ?? 0;
+  const color = pct > 88 ? "#ff5555" : pct > 70 ? "#ffaa00" : "#00d4ff";
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[8px] tracking-widest text-blue-400/40 w-8 shrink-0">{label}</span>
+      <div className="flex-1 h-[5px] rounded-full overflow-hidden" style={{ background: "rgba(0,60,100,0.35)" }}>
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: `linear-gradient(90deg, ${color}77, ${color})`, boxShadow: `0 0 6px ${color}66` }}
+          animate={{ width: `${Math.min(pct, 100)}%` }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+        />
+      </div>
+      <span className="text-[9px] font-mono w-9 text-right shrink-0" style={{ color: `${color}cc` }}>
+        {value === null ? "—" : `${Math.round(pct)}%`}
+      </span>
+    </div>
+  );
+}
+
 function DataReadout({ label, value, color = "#00d4ff" }: { label: string; value: string; color?: string }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -88,6 +109,7 @@ function LeftPanel() {
   const llmAvailable = useJarvisStore((s) => s.llmAvailable);
   const providerLabel = useJarvisStore((s) => s.providerLabel);
   const providerModel = useJarvisStore((s) => s.providerModel);
+  const metrics = useJarvisStore((s) => s.metrics);
 
   const toggleMute = () => {
     const next = !ttsEnabled;
@@ -151,13 +173,12 @@ function LeftPanel() {
           <DataReadout label="VRAM" value={hwInfo.vram} />
           <DataReadout label="MOTEUR" value={hwInfo.cuda} />
         </div>
-        <div className="h-1 bg-cyan-950 rounded-full overflow-hidden">
-          <motion.div
-            className="h-full rounded-full"
-            style={{ background: `linear-gradient(90deg, ${col}, #00d4ff)` }}
-            animate={{ width: status === "processing" ? "85%" : status === "listening" ? "60%" : "35%" }}
-            transition={{ duration: 0.5 }}
-          />
+        {/* Métriques temps réel (poussées toutes les 3 s par le serveur) */}
+        <div className="flex flex-col gap-1.5 pt-1">
+          <MetricBar label="CPU" value={metrics.cpu} />
+          <MetricBar label="RAM" value={metrics.ram} />
+          <MetricBar label="GPU" value={metrics.gpu} />
+          <MetricBar label="VRAM" value={metrics.vram} />
         </div>
       </div>
 
@@ -405,7 +426,7 @@ function Header() {
           <span ref={timeRef} />
         </span>
         <div className="w-px h-3 bg-cyan-900/40" />
-        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.3.0</span>
+        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.4.0</span>
         <div className="w-px h-3 bg-cyan-900/40" />
         <SettingsPanel />
         <div className="w-px h-3 bg-cyan-900/40" />
