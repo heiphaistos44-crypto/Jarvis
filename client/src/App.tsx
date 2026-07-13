@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Trash2, Volume2, VolumeX, MicOff } from "lucide-react";
-import { VoiceVisualizer } from "./components/VoiceVisualizer/VoiceVisualizer";
 import { ChatPanel } from "./components/ChatPanel/ChatPanel";
 import { CommandInput } from "./components/CommandInput/CommandInput";
 import { SettingsPanel } from "./components/Settings/SettingsPanel";
@@ -182,18 +181,20 @@ function LeftPanel() {
         </div>
       </div>
 
-      {/* Arc reactor visualizer */}
+      {/* Hologramme 3D animé — premier plan, remplace l'ancien visualiseur 2D */}
       <div className="flex-1 flex flex-col items-center justify-center gap-4 py-4">
-        <div className="relative">
+        <div className="relative w-full flex-1 min-h-[220px]">
           <motion.div
-            className="absolute inset-0 rounded-full"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full pointer-events-none"
             style={{
-              boxShadow: `0 0 30px ${col}44, 0 0 60px ${col}22, inset 0 0 30px ${col}11`,
+              boxShadow: `0 0 40px ${col}33, 0 0 90px ${col}18`,
             }}
-            animate={{ opacity: [0.6, 1, 0.6] }}
+            animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 2, repeat: Infinity }}
           />
-          <VoiceVisualizer />
+          <Suspense fallback={null}>
+            <JarvisScene />
+          </Suspense>
         </div>
 
         <AnimatePresence mode="wait">
@@ -469,9 +470,6 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col relative overflow-hidden bg-[#010d1a]">
       <HexGrid />
-      <Suspense fallback={null}>
-        <JarvisScene />
-      </Suspense>
       <ScanLine />
 
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full pointer-events-none"

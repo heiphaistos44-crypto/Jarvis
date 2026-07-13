@@ -146,13 +146,14 @@ function CoreGlow() {
   );
 }
 
-/** Fond holographique 3D plein écran — sphère de particules + anneaux orbitaux,
- *  audio-réactif sur le TTS, couleur pilotée par le statut JARVIS. */
+/** Hologramme 3D animé — sphère de particules + anneaux orbitaux,
+ *  audio-réactif sur le TTS, couleur pilotée par le statut JARVIS.
+ *  Remplit son conteneur parent (position: relative requis). */
 export function JarvisScene() {
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
+    <div className="absolute inset-0 pointer-events-none">
       <Canvas
-        camera={{ position: [0, 0, 4.2], fov: 50 }}
+        camera={{ position: [0, 0, 4.0], fov: 52 }}
         gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
         dpr={[1, 1.5]}
       >

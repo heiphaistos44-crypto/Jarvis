@@ -18,6 +18,30 @@ logger = get_logger("tts")
 
 MAX_TTS_CHARS = 1000
 
+# Voix masculines connues dans les modèles Piper multi-locuteurs
+_MALE_SPEAKERS = {"pierre", "tom", "gilles", "male"}
+
+
+def _male_speaker_id(voice_path: Path) -> int | None:
+    """ID du locuteur masculin d'un modèle multi-speakers, sinon None.
+
+    fr_FR-upmc-medium contient jessica (0, défaut Piper !) et pierre (1) —
+    sans --speaker, Piper parle avec la voix féminine.
+    """
+    import json
+    config_path = Path(str(voice_path) + ".json")
+    try:
+        cfg = json.loads(config_path.read_text(encoding="utf-8"))
+        if int(cfg.get("num_speakers", 1)) <= 1:
+            return None
+        speaker_map: dict[str, int] = cfg.get("speaker_id_map", {})
+        for name, sid in speaker_map.items():
+            if name.lower() in _MALE_SPEAKERS:
+                return int(sid)
+    except Exception:
+        pass
+    return None
+
 
 class TTSManager:
     """Deux moteurs : Edge-TTS (voix neurales naturelles, en ligne) et Piper
@@ -29,6 +53,7 @@ class TTSManager:
     def __init__(self, settings: "Settings") -> None:
         self._piper_exe = settings.piper_exe
         self._voice = settings.piper_voice
+        self._speaker: int | None = _male_speaker_id(settings.piper_voice)
         self._edge_voice: str | None = None
         self._edge_down_until: float = 0.0
         self._piper_ok = self._piper_exe.exists() and self._voice.exists()
@@ -44,8 +69,9 @@ class TTSManager:
     def set_voice(self, voice_path: Path) -> None:
         self._edge_voice = None
         self._voice = voice_path
+        self._speaker = _male_speaker_id(voice_path)
         self._piper_ok = self._piper_exe.exists() and voice_path.exists()
-        logger.info(f"Voix TTS changée: {voice_path.name}")
+        logger.info(f"Voix TTS changée: {voice_path.name} (speaker={self._speaker})")
 
     def set_edge_voice(self, voice_name: str) -> None:
         """Active une voix neurale Edge-TTS (ex. fr-FR-HenriNeural)."""
@@ -55,6 +81,7 @@ class TTSManager:
         default_male = self._piper_exe.parent / "fr_FR-upmc-medium.onnx"
         if default_male.exists():
             self._voice = default_male
+            self._speaker = _male_speaker_id(default_male)
             self._piper_ok = self._piper_exe.exists()
         logger.info(f"Voix TTS changée: {voice_name} (Edge, secours Piper {self._voice.stem})")
 
@@ -106,14 +133,15 @@ class TTSManager:
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
                     tmp_path = Path(tmp.name)
 
+                cmd = [
+                    str(self._piper_exe),
+                    "--model", str(self._voice),
+                    "--output_file", str(tmp_path),
+                ]
+                if self._speaker is not None:
+                    cmd += ["--speaker", str(self._speaker)]
                 proc = subprocess.run(
-                    [
-                        str(self._piper_exe),
-                        "--model",
-                        str(self._voice),
-                        "--output_file",
-                        str(tmp_path),
-                    ],
+                    cmd,
                     input=text.encode("utf-8"),
                     capture_output=True,
                     timeout=30,

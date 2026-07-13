@@ -20,7 +20,11 @@ _rate_limiter = RateLimiter()
 
 logger = get_logger("websocket")
 
-CHUNK_THRESHOLD = 32  # ~2.7s d'audio à 48kHz avant transcription en streaming
+# Fin de parole par détection de silence — plus de découpage arbitraire qui
+# coupait les phrases en morceaux toutes les ~2,7 s.
+SPEECH_RMS = 0.008          # au-dessus : de la parole est présente
+SILENCE_CHUNKS_END = 11     # ~0.9 s de silence après parole → transcrire
+MAX_UTTERANCE_CHUNKS = 360  # ~30 s : borne dure anti-débordement
 MAX_PAYLOAD_BYTES = 2 * 1024 * 1024   # 2 MB — audio chunk upper bound
 MAX_TEXT_CHARS = 2000
 ALLOWED_ORIGINS = {
@@ -506,6 +510,8 @@ async def websocket_handler(
 
     audio_buffer: list[list[float]] = []
     current_sample_rate: int = 16000
+    speech_detected: bool = False   # de la parole a été entendue dans le buffer
+    silence_run: int = 0            # chunks de silence consécutifs
     tts_enabled: bool = True
     wake_detector = None  # lazy — instancié au 1er wake_audio (modèle stateful par connexion)
     query_task: asyncio.Task | None = None  # requête en cours — annulable via stop_generation
@@ -577,9 +583,25 @@ async def websocket_handler(
                     current_sample_rate = int(payload.get("sampleRate", 16000))
                     if len(audio_buffer) == 1:
                         await manager.send(ws, "status", {"status": "listening"})
-                    if len(audio_buffer) >= CHUNK_THRESHOLD:
+
+                    # Détection de fin de parole : RMS du chunk
+                    _sq = 0.0
+                    for _v in chunk_data:
+                        _sq += _v * _v
+                    _rms = (_sq / max(len(chunk_data), 1)) ** 0.5
+                    if _rms >= SPEECH_RMS:
+                        speech_detected = True
+                        silence_run = 0
+                    else:
+                        silence_run += 1
+
+                    end_of_speech = speech_detected and silence_run >= SILENCE_CHUNKS_END
+                    overflow = len(audio_buffer) >= MAX_UTTERANCE_CHUNKS
+                    if end_of_speech or overflow:
                         chunks = list(audio_buffer)
                         audio_buffer.clear()
+                        speech_detected = False
+                        silence_run = 0
                         if query_task is not None and not query_task.done():
                             query_task.cancel()
                         query_task = asyncio.create_task(_run_query(transcribe_and_query(
@@ -609,6 +631,8 @@ async def websocket_handler(
                     wake_detector.reset()
 
             elif event_type == "mic_stop":
+                speech_detected = False
+                silence_run = 0
                 if audio_buffer and stt.is_available:
                     chunks = list(audio_buffer)
                     audio_buffer.clear()

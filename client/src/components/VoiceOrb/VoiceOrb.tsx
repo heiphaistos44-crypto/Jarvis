@@ -3,15 +3,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useJarvisStore, getTtsAnalyser } from "../../stores/jarvisStore";
 
 const ORB_STATES = {
-  listening: { color: "#ff4455", halo: "#ff8899", label: "JE VOUS ÉCOUTE, MONSIEUR" },
-  processing: { color: "#ffaa00", halo: "#ffd580", label: "ANALYSE EN COURS" },
-  speaking: { color: "#00ff88", halo: "#7fffc8", label: "" },
+  listening: { color: "#ff4455", halo: "#ff8899", label: "ÉCOUTE" },
+  processing: { color: "#ffaa00", halo: "#ffd580", label: "ANALYSE" },
+  speaking: { color: "#00ff88", halo: "#7fffc8", label: "PAROLE" },
 } as const;
 
 type OrbStatus = keyof typeof ORB_STATES;
 
-/** Overlay plein écran type Siri — blobs morphants audio-réactifs.
- *  Visible pendant écoute / réflexion / parole (micro actif uniquement). */
+/** Hologramme vocal compact — orbe flottant en bas à droite pendant
+ *  écoute / analyse / parole. Ne couvre pas la page, ne bloque rien. */
 export function VoiceOrb() {
   const status = useJarvisStore((s) => s.status);
   const isMicActive = useJarvisStore((s) => s.isMicActive);
@@ -23,16 +23,16 @@ export function VoiceOrb() {
 
   return (
     <AnimatePresence>
-      {orbStatus && <OrbOverlay orbStatus={orbStatus} />}
+      {orbStatus && <CompactOrb orbStatus={orbStatus} />}
     </AnimatePresence>
   );
 }
 
-function OrbOverlay({ orbStatus }: { orbStatus: OrbStatus }) {
+function CompactOrb({ orbStatus }: { orbStatus: OrbStatus }) {
   const scaleRef = useRef<HTMLDivElement>(null);
   const conf = ORB_STATES[orbStatus];
 
-  // Réaction audio : TTS analyser quand JARVIS parle
+  // Réaction audio quand JARVIS parle
   useEffect(() => {
     if (orbStatus !== "speaking") return;
     const buf = new Uint8Array(256);
@@ -44,7 +44,7 @@ function OrbOverlay({ orbStatus }: { orbStatus: OrbStatus }) {
         let sum = 0;
         for (let i = 0; i < buf.length; i++) sum += buf[i];
         const level = sum / (buf.length * 255);
-        scaleRef.current.style.transform = `scale(${1 + level * 0.45})`;
+        scaleRef.current.style.transform = `scale(${1 + level * 0.4})`;
       }
       raf = requestAnimationFrame(tick);
     };
@@ -54,26 +54,19 @@ function OrbOverlay({ orbStatus }: { orbStatus: OrbStatus }) {
 
   return (
     <motion.div
-      className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-10 pointer-events-none"
-      style={{ background: "rgba(1, 8, 16, 0.82)", backdropFilter: "blur(6px)" }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
+      className="fixed bottom-24 right-8 z-40 flex flex-col items-center gap-2 pointer-events-none"
+      initial={{ opacity: 0, scale: 0.5, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.5, y: 20 }}
+      transition={{ type: "spring", stiffness: 260, damping: 20 }}
     >
-      <motion.div
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.6, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 200, damping: 18 }}
-        className="relative w-56 h-56"
-      >
+      <div className="relative w-28 h-28">
         {/* Halo conique tournant */}
         <motion.div
-          className="absolute -inset-4 rounded-full"
+          className="absolute -inset-2 rounded-full"
           style={{
-            background: `conic-gradient(from 0deg, ${conf.color}00, ${conf.halo}88, ${conf.color}00 60%)`,
-            filter: "blur(14px)",
+            background: `conic-gradient(from 0deg, ${conf.color}00, ${conf.halo}77, ${conf.color}00 60%)`,
+            filter: "blur(10px)",
           }}
           animate={{ rotate: 360 }}
           transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }}
@@ -85,7 +78,7 @@ function OrbOverlay({ orbStatus }: { orbStatus: OrbStatus }) {
               key={i}
               className="absolute inset-0"
               style={{
-                background: `radial-gradient(circle at ${40 + i * 12}% ${45 + i * 8}%, ${conf.halo}cc, ${conf.color}44 60%, transparent 75%)`,
+                background: `radial-gradient(circle at ${40 + i * 12}% ${45 + i * 8}%, ${conf.halo}bb, ${conf.color}44 60%, transparent 75%)`,
                 borderRadius: "50%",
                 mixBlendMode: "screen",
               }}
@@ -102,27 +95,31 @@ function OrbOverlay({ orbStatus }: { orbStatus: OrbStatus }) {
           ))}
           {/* Cœur lumineux */}
           <motion.div
-            className="absolute inset-[30%] rounded-full"
+            className="absolute inset-[32%] rounded-full"
             style={{
-              background: `radial-gradient(circle, #ffffffee, ${conf.color}88 70%)`,
-              boxShadow: `0 0 50px ${conf.color}aa`,
+              background: `radial-gradient(circle, #ffffffdd, ${conf.color}77 70%)`,
+              boxShadow: `0 0 30px ${conf.color}88`,
             }}
             animate={{ scale: [1, 1.12, 1] }}
             transition={{ duration: 1.4, repeat: Infinity }}
           />
         </div>
-      </motion.div>
+      </div>
 
-      {conf.label && (
-        <motion.p
-          className="text-xs tracking-[0.45em] font-bold"
-          style={{ color: conf.color, textShadow: `0 0 14px ${conf.color}` }}
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 1.8, repeat: Infinity }}
-        >
-          {conf.label}
-        </motion.p>
-      )}
+      <motion.span
+        className="text-[9px] tracking-[0.4em] font-bold px-2.5 py-1 rounded-full"
+        style={{
+          color: conf.color,
+          textShadow: `0 0 10px ${conf.color}`,
+          background: "rgba(2,10,24,0.6)",
+          border: `1px solid ${conf.color}33`,
+          backdropFilter: "blur(8px)",
+        }}
+        animate={{ opacity: [0.6, 1, 0.6] }}
+        transition={{ duration: 1.8, repeat: Infinity }}
+      >
+        {conf.label}
+      </motion.span>
     </motion.div>
   );
 }
