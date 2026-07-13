@@ -176,6 +176,16 @@ class LLMManager:
                 chat_format="mistral-instruct",
                 verbose=False,
             )
+            # Cache KV : sans lui, TOUT le prompt (system ~3k tokens + historique)
+            # est ré-évalué à chaque message → plusieurs secondes de latence.
+            # Avec le cache, seuls les nouveaux tokens sont évalués tant que le
+            # préfixe du prompt reste identique.
+            try:
+                from llama_cpp import LlamaRAMCache  # type: ignore[import]
+                self._llm.set_cache(LlamaRAMCache(capacity_bytes=512 * 1024 * 1024))
+                logger.info("Cache KV LlamaRAMCache activé (512 MB)")
+            except Exception as e:
+                logger.warning(f"Cache KV indisponible: {e}")
             logger.info(f"LLM chargé: {model_path.name}")
         except ImportError:
             logger.warning("llama-cpp-python non installé — LLM désactivé")

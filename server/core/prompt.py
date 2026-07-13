@@ -7,14 +7,23 @@ from utils.logger import get_logger
 logger = get_logger("prompt")
 
 
-def build_system_prompt(tier: str, user_text: str) -> str:
-    """Compose le system prompt : base + disciplines Fable routées + mémoire + leçons.
+def build_system_prompt(tier: str, user_text: str, stable: bool = False) -> str:
+    """Compose le system prompt : base + disciplines Fable + mémoire + leçons.
 
     tier: "local" (variantes compactes) ou "cloud" (variantes complètes).
+    stable: inclut TOUTES les disciplines (pas de routage par intent) — prompt
+    identique d'un message à l'autre, indispensable pour préserver le cache KV
+    llama-cpp en local (sinon ré-évaluation complète à chaque message).
     """
     parts = [SYSTEM_PROMPT]
 
-    skills_block = get_router().select(user_text, tier)
+    router = get_router()
+    if stable:
+        skills_block = "\n\n".join(
+            f"### {s.name}\n{s.body(tier)}" for s in router.skills
+        )
+    else:
+        skills_block = router.select(user_text, tier)
     if skills_block:
         parts.append(
             "\n\n## DISCIPLINES ACTIVES (à appliquer strictement)\n\n" + skills_block

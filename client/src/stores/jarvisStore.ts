@@ -10,14 +10,22 @@ export let ttsAnalyser: AnalyserNode | null = null;
 export function getTtsAnalyser(): AnalyserNode | null {
   return ttsAnalyser;
 }
-function getAudioContext(): AudioContext {
+async function getAudioContext(): Promise<AudioContext> {
   if (!_audioCtx || _audioCtx.state === "closed") {
     _audioCtx = new AudioContext();
     ttsAnalyser = _audioCtx.createAnalyser();
     ttsAnalyser.fftSize = 512;
     ttsAnalyser.connect(_audioCtx.destination);
   }
-  if (_audioCtx.state === "suspended") void _audioCtx.resume();
+  if (_audioCtx.state === "suspended") {
+    // Sans await, la lecture démarre sur un contexte suspendu → aucun son
+    // et onended ne se déclenche jamais (queue TTS bloquée 60s).
+    try {
+      await _audioCtx.resume();
+    } catch (e) {
+      console.error("AudioContext resume failed:", e);
+    }
+  }
   return _audioCtx;
 }
 
@@ -65,7 +73,7 @@ async function playTtsAudio(b64: string, onDone: () => void) {
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const buffer = await ctx.decodeAudioData(bytes.buffer);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -105,7 +113,7 @@ async function _playNextChunk(onAllDone: () => void): Promise<void> {
     const binary = atob(b64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const buffer = await ctx.decodeAudioData(bytes.buffer);
     const source = ctx.createBufferSource();
     source.buffer = buffer;

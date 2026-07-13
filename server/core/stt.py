@@ -9,8 +9,9 @@ if TYPE_CHECKING:
 
 logger = get_logger("stt")
 
-# Seuil RMS relevé : le micro WASAPI capture à volume plus élevé qu'un stream WebView2
-RMS_THRESHOLD = 0.02
+# Seuil bas : les micros portables capturent la parole vers RMS 0.01 — le VAD
+# Silero + la blocklist d'hallucinations filtrent le vrai bruit en aval.
+RMS_THRESHOLD = 0.005
 # Seuil plus strict pour rejeter les segments sans parole
 NO_SPEECH_THRESHOLD = 0.75
 # Durée minimale de parole détectée (en secondes) pour déclencher la transcription
@@ -71,7 +72,7 @@ class STTManager:
                 from scipy.signal import resample_poly  # type: ignore[import]
                 g = gcd(target_rate, sample_rate)
                 audio = resample_poly(audio, target_rate // g, sample_rate // g).astype(np.float32)
-                logger.debug(f"Resampled {sample_rate}→{target_rate} Hz ({len(audio)} samples)")
+                logger.debug(f"Resampled {sample_rate}->{target_rate} Hz ({len(audio)} samples)")
 
             rms = float(np.sqrt(np.mean(audio ** 2)))
             logger.debug(f"Audio RMS={rms:.4f} (seuil={RMS_THRESHOLD})")
@@ -84,7 +85,7 @@ class STTManager:
             target_rms = 0.1
             gain = min(target_rms / rms, 31.6)  # max ~30 dB
             audio = (audio * gain).clip(-1.0, 1.0)
-            logger.debug(f"Gain appliqué: x{gain:.2f} (RMS {rms:.4f}→{target_rms:.4f})")
+            logger.debug(f"Gain appliqué: x{gain:.2f} (RMS {rms:.4f}->{target_rms:.4f})")
 
             segments, info = self._model.transcribe(  # type: ignore[union-attr]
                 audio,

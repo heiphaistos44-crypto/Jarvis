@@ -27,6 +27,13 @@ def get_logger(name: str) -> logging.Logger:
     if not logger.handlers:
         logger.setLevel(logging.DEBUG)
         logger.addHandler(_build_handler())
+        # reconfigure(errors="replace") : la console Windows cp1252 plante sur
+        # les caractères Unicode (→, ✓) et pollue les logs de stacktraces.
+        if hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(errors="replace")
+            except Exception:
+                pass
         stream = logging.StreamHandler(sys.stdout)
         stream.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
         logger.addHandler(stream)

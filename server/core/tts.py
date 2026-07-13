@@ -76,6 +76,7 @@ class TTSManager:
 
         try:
             wav_bytes = await asyncio.to_thread(_run)
+            logger.debug(f"TTS OK: {len(wav_bytes)} bytes pour {len(text)} chars")
             return base64.b64encode(wav_bytes).decode()
         except Exception as e:
             logger.error(f"TTS synthèse échouée: {e}")

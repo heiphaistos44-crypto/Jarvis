@@ -320,6 +320,11 @@ async def _tts_sentence_worker(
             pass  # WebSocket déjà fermé — normal à la déconnexion
 
 
+# Cache par connexion du system prompt local (stable → cache KV llama-cpp
+# préservé). Clé : id(memory) — une ContextMemory par connexion.
+_system_cache: dict[int, str] = {}
+
+
 async def handle_text_query(
     ws: WebSocket,
     text: str,
@@ -332,7 +337,15 @@ async def handle_text_query(
     await manager.send(ws, "status", {"status": "processing"})
     memory.add_user(text)
     message_id = str(uuid.uuid4())
-    system = build_system_prompt(providers.tier, text)
+
+    if providers.tier == "local":
+        # Prompt STABLE sur toute la connexion : indispensable au cache KV.
+        key = id(memory)
+        if key not in _system_cache:
+            _system_cache[key] = build_system_prompt("local", text, stable=True)
+        system = _system_cache[key]
+    else:
+        system = build_system_prompt(providers.tier, text)
 
     # Routeur d'intention : les demandes évidentes exécutent l'outil
     # immédiatement, sans dépendre du LLM pour le déclencher.
@@ -563,4 +576,5 @@ async def websocket_handler(
         alert_task.cancel()
         _monitor_unsubscribe(alert_queue)
         _rate_limiter.cleanup(ws_id)
+        _system_cache.pop(id(memory), None)
         manager.disconnect(ws)
