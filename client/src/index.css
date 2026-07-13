@@ -11,14 +11,44 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--jarvis-dark);
+  background: radial-gradient(ellipse 120% 90% at 50% -10%, #06182e 0%, var(--jarvis-dark) 55%, #01060e 100%);
   color: #e0f4ff;
-  font-family: 'Courier New', monospace;
+  font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  font-feature-settings: "ss01";
 }
 
-::-webkit-scrollbar { width: 4px; }
+code, pre, .font-mono {
+  font-family: "Cascadia Mono", "Consolas", "Courier New", monospace;
+}
+
+/* Panneau verre dépoli — laisse transparaître l'hologramme 3D derrière */
+.glass-panel {
+  background: linear-gradient(165deg, rgba(8, 26, 50, 0.52), rgba(2, 10, 24, 0.62));
+  border: 1px solid rgba(0, 212, 255, 0.12);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow:
+    0 10px 44px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 60px rgba(0, 212, 255, 0.025);
+}
+
+.glass-subtle {
+  background: linear-gradient(165deg, rgba(8, 26, 50, 0.38), rgba(2, 10, 24, 0.46));
+  border: 1px solid rgba(0, 212, 255, 0.10);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--jarvis-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.22);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.4); }
+
+::selection { background: rgba(0, 212, 255, 0.3); color: #fff; }

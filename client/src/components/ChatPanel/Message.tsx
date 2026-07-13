@@ -389,18 +389,18 @@ export function Message({ message }: Props) {
           style={
             isUser
               ? {
-                  background: "linear-gradient(135deg, rgba(0,80,120,0.4), rgba(0,40,80,0.6))",
-                  border: "1px solid rgba(0,212,255,0.25)",
-                  borderRadius: "12px 2px 12px 12px",
-                  backdropFilter: "blur(12px)",
-                  boxShadow: "0 0 20px #00d4ff11, inset 0 0 20px #00d4ff08",
+                  background: "linear-gradient(135deg, rgba(0,120,190,0.30), rgba(0,60,130,0.38))",
+                  border: "1px solid rgba(0,212,255,0.22)",
+                  borderRadius: "18px 6px 18px 18px",
+                  backdropFilter: "blur(14px) saturate(150%)",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.25), 0 0 20px #00d4ff0d, inset 0 1px 0 rgba(255,255,255,0.06)",
                 }
               : {
-                  background: "linear-gradient(135deg, rgba(0,20,50,0.6), rgba(0,10,30,0.8))",
-                  border: "1px solid rgba(0,136,170,0.2)",
-                  borderRadius: "2px 12px 12px 12px",
-                  backdropFilter: "blur(12px)",
-                  boxShadow: "0 0 20px #00d4ff08",
+                  background: "linear-gradient(150deg, rgba(10,28,54,0.55), rgba(3,12,28,0.65))",
+                  border: "1px solid rgba(0,180,220,0.14)",
+                  borderRadius: "6px 18px 18px 18px",
+                  backdropFilter: "blur(14px) saturate(150%)",
+                  boxShadow: "0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)",
                 }
           }
         >

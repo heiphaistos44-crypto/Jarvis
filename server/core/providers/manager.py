@@ -31,8 +31,12 @@ PRESETS: dict[str, dict] = {
                    "base_url": "https://api.deepseek.com/v1", "model": "deepseek-chat", "needs_key": True},
     "xai":        {"kind": "openai", "label": "xAI (Grok)",
                    "base_url": "https://api.x.ai/v1", "model": "grok-3-mini", "needs_key": True},
-    "openrouter": {"kind": "openai", "label": "OpenRouter",
-                   "base_url": "https://openrouter.ai/api/v1", "model": "", "needs_key": True},
+    "openrouter": {"kind": "openai", "label": "OpenRouter (modèles :free)",
+                   "base_url": "https://openrouter.ai/api/v1", "model": "meta-llama/llama-3.3-70b-instruct:free", "needs_key": True},
+    "cerebras":   {"kind": "openai", "label": "Cerebras (gratuit, ultra-rapide)",
+                   "base_url": "https://api.cerebras.ai/v1", "model": "llama-3.3-70b", "needs_key": True},
+    "huggingface": {"kind": "openai", "label": "Hugging Face (gratuit)",
+                    "base_url": "https://router.huggingface.co/v1", "model": "meta-llama/Llama-3.3-70B-Instruct", "needs_key": True},
     "mistral":    {"kind": "openai", "label": "Mistral API",
                    "base_url": "https://api.mistral.ai/v1", "model": "mistral-small-latest", "needs_key": True},
     "lmstudio":   {"kind": "openai", "label": "LM Studio (local)",
@@ -45,8 +49,9 @@ PRESETS: dict[str, dict] = {
 
 # Ordre de préférence pour juger le conseil multi-IA (du plus capable au moins)
 _JUDGE_ORDER = [
-    "anthropic", "openai", "gemini", "groq", "deepseek", "xai",
-    "mistral", "openrouter", "pollinations", "lmstudio", "ollama", "custom",
+    "anthropic", "openai", "gemini", "groq", "cerebras", "deepseek", "xai",
+    "mistral", "openrouter", "huggingface", "pollinations", "lmstudio",
+    "ollama", "custom",
 ]
 
 _CONFIG_FIELDS = {"api_key", "model", "base_url"}

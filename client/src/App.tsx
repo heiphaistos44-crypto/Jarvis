@@ -143,7 +143,7 @@ function LeftPanel() {
   const col = statusColors[status];
 
   return (
-    <div className="w-72 flex flex-col relative border-r border-cyan-900/20">
+    <div className="w-72 flex flex-col relative glass-panel rounded-2xl overflow-hidden">
       {/* Top data strip */}
       <div className="px-4 pt-3 pb-2 border-b border-cyan-900/20 flex flex-col gap-2">
         <div className="flex justify-between items-start">
@@ -367,7 +367,7 @@ function Header() {
 
   return (
     <div
-      className="relative z-10 flex items-center justify-between px-4 py-2 border-b border-cyan-900/30"
+      className="relative z-10 flex items-center justify-between px-4 py-2 mx-3 mt-3 mb-2 rounded-2xl glass-subtle"
       data-tauri-drag-region
     >
       <div className="flex items-center gap-4" data-tauri-drag-region>
@@ -405,7 +405,7 @@ function Header() {
           <span ref={timeRef} />
         </span>
         <div className="w-px h-3 bg-cyan-900/40" />
-        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.2.0</span>
+        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.3.0</span>
         <div className="w-px h-3 bg-cyan-900/40" />
         <SettingsPanel />
         <div className="w-px h-3 bg-cyan-900/40" />
@@ -460,10 +460,10 @@ export default function App() {
 
       <Header />
 
-      <div className="flex-1 flex overflow-hidden relative z-10">
+      <div className="flex-1 flex overflow-hidden relative z-10 gap-3 px-3 pb-3 pt-1">
         <LeftPanel />
 
-        <div className="flex-1 flex flex-col relative">
+        <div className="flex-1 flex flex-col relative glass-panel rounded-2xl overflow-hidden">
           <ChatAreaFrame />
           <ChatPanel />
           <AgentSteps />

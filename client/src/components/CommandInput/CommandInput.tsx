@@ -68,13 +68,13 @@ export function CommandInput() {
 
       {/* Input container */}
       <div
-        className="flex items-center gap-3 px-4 py-3 relative"
+        className="flex items-center gap-3 px-4 py-2.5 relative"
         style={{
-          background: "linear-gradient(135deg, rgba(0,20,50,0.8), rgba(0,10,30,0.9))",
-          border: `1px solid ${isMicActive ? "#00ff8844" : "#00d4ff22"}`,
-          borderRadius: "4px",
-          backdropFilter: "blur(16px)",
-          boxShadow: `0 0 20px ${activeColor}11, inset 0 0 30px #00d4ff06`,
+          background: "linear-gradient(150deg, rgba(10,28,54,0.65), rgba(3,12,28,0.75))",
+          border: `1px solid ${isMicActive ? "#00ff8844" : "#00d4ff26"}`,
+          borderRadius: "16px",
+          backdropFilter: "blur(16px) saturate(150%)",
+          boxShadow: `0 6px 28px rgba(0,0,0,0.35), 0 0 20px ${activeColor}0d, inset 0 1px 0 rgba(255,255,255,0.05)`,
           transition: "border-color 0.3s, box-shadow 0.3s",
         }}
       >
