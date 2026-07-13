@@ -7,6 +7,7 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; pulse: boolean }
 > = {
   idle: { label: "STANDBY", color: "text-blue-400", pulse: false },
+  standby: { label: "HEY JARVIS", color: "text-blue-400", pulse: true },
   listening: { label: "LISTENING", color: "text-green-400", pulse: true },
   processing: { label: "PROCESSING...", color: "text-amber-400", pulse: true },
   speaking: { label: "SPEAKING", color: "text-cyan-400", pulse: true },

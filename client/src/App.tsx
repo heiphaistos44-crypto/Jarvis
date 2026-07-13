@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Trash2, Volume2, VolumeX, MicOff } from "lucide-react";
@@ -6,6 +6,14 @@ import { VoiceVisualizer } from "./components/VoiceVisualizer/VoiceVisualizer";
 import { ChatPanel } from "./components/ChatPanel/ChatPanel";
 import { CommandInput } from "./components/CommandInput/CommandInput";
 import { SettingsPanel } from "./components/Settings/SettingsPanel";
+import { BootSequence } from "./components/Boot/BootSequence";
+import { VoiceOrb } from "./components/VoiceOrb/VoiceOrb";
+
+// three.js chargé en différé — n'alourdit pas le démarrage
+const JarvisScene = lazy(() =>
+  import("./components/Scene/JarvisScene").then((m) => ({ default: m.JarvisScene }))
+);
+import { AgentSteps } from "./components/AgentSteps/AgentSteps";
 import { useJarvisStore } from "./stores/jarvisStore";
 import type { JarvisStatus } from "./types";
 
@@ -78,6 +86,8 @@ function LeftPanel() {
   const clearMessages = useJarvisStore((s) => s.clearMessages);
   const sttAvailable = useJarvisStore((s) => s.sttAvailable);
   const llmAvailable = useJarvisStore((s) => s.llmAvailable);
+  const providerLabel = useJarvisStore((s) => s.providerLabel);
+  const providerModel = useJarvisStore((s) => s.providerModel);
 
   const toggleMute = () => {
     const next = !ttsEnabled;
@@ -116,13 +126,15 @@ function LeftPanel() {
 
   const statusColors: Record<JarvisStatus, string> = {
     idle: "#00d4ff",
+    standby: "#3388cc",
     listening: "#00ff88",
     processing: "#ffaa00",
     speaking: "#8866ff",
     error: "#ff3333",
   };
   const statusLabels: Record<JarvisStatus, string> = {
-    idle: "STANDBY",
+    idle: "PRÊT",
+    standby: "VEILLE — « HEY JARVIS »",
     listening: "ÉCOUTE",
     processing: "ANALYSE",
     speaking: "PAROLE",
@@ -251,7 +263,10 @@ function LeftPanel() {
           <DataReadout label="CONNEXION" value={isConnected ? "ACTIVE" : "COUPÉE"} color={isConnected ? "#00ff88" : "#ff3333"} />
           <DataReadout label="PROTOCOLE" value="WS-8765" />
           <DataReadout label="MÉMOIRE" value={`${memCount} FACTS`} />
-          <DataReadout label="MODÈLE" value="MISTRAL 7B" />
+          <DataReadout
+            label="CERVEAU"
+            value={(providerModel || providerLabel).toUpperCase().slice(0, 16)}
+          />
         </div>
         {/* Clear history button */}
         <motion.button
@@ -390,7 +405,7 @@ function Header() {
           <span ref={timeRef} />
         </span>
         <div className="w-px h-3 bg-cyan-900/40" />
-        <span className="text-[10px] text-cyan-400/60 tracking-widest">v3.0.0</span>
+        <span className="text-[10px] text-cyan-400/60 tracking-widest">v4.0.0</span>
         <div className="w-px h-3 bg-cyan-900/40" />
         <SettingsPanel />
         <div className="w-px h-3 bg-cyan-900/40" />
@@ -433,6 +448,9 @@ export default function App() {
   return (
     <div className="h-screen flex flex-col relative overflow-hidden bg-[#010d1a]">
       <HexGrid />
+      <Suspense fallback={null}>
+        <JarvisScene />
+      </Suspense>
       <ScanLine />
 
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full pointer-events-none"
@@ -448,6 +466,7 @@ export default function App() {
         <div className="flex-1 flex flex-col relative">
           <ChatAreaFrame />
           <ChatPanel />
+          <AgentSteps />
           <CommandInput />
         </div>
       </div>
@@ -456,6 +475,9 @@ export default function App() {
       <Corner pos="tr" />
       <Corner pos="bl" />
       <Corner pos="br" />
+
+      <VoiceOrb />
+      <BootSequence />
     </div>
   );
 }

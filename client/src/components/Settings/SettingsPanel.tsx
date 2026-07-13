@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings, X, Volume2, VolumeX, Mic, Globe, Mail, CheckCircle, AlertCircle, Upload } from "lucide-react";
+import { Settings, X, Volume2, VolumeX, Mic, Globe, Mail, CheckCircle, AlertCircle, Upload, Cpu, Ear } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useJarvisStore } from "../../stores/jarvisStore";
+import { ProvidersTab } from "./ProvidersTab";
 
 interface VoiceOption {
   id: string;
@@ -20,12 +21,15 @@ type GmailStatus = "loading" | "non_configured" | "not_authenticated" | "connect
 
 export function SettingsPanel() {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"voice" | "services">("voice");
+  const [activeTab, setActiveTab] = useState<"voice" | "brain" | "services">("voice");
 
   const ttsEnabled = useJarvisStore((s) => s.ttsEnabled);
   const selectedVoice = useJarvisStore((s) => s.selectedVoice);
   const setTtsEnabled = useJarvisStore((s) => s.setTtsEnabled);
   const setSelectedVoice = useJarvisStore((s) => s.setSelectedVoice);
+  const wakeWordEnabled = useJarvisStore((s) => s.wakeWordEnabled);
+  const wakeWordAvailable = useJarvisStore((s) => s.wakeWordAvailable);
+  const setWakeWordEnabled = useJarvisStore((s) => s.setWakeWordEnabled);
   const wsSend = useJarvisStore((s) => s.wsSend);
   const [availableVoices, setAvailableVoices] = useState<string[]>([]);
 
@@ -103,6 +107,7 @@ export function SettingsPanel() {
 
   const tabs = [
     { id: "voice" as const, label: "VOIX", icon: <Volume2 size={11} /> },
+    { id: "brain" as const, label: "CERVEAU", icon: <Cpu size={11} /> },
     { id: "services" as const, label: "SERVICES", icon: <Globe size={11} /> },
   ];
 
@@ -247,6 +252,42 @@ export function SettingsPanel() {
                         </div>
                       </div>
 
+                      {/* Wake word toggle */}
+                      <div className="flex flex-col gap-2 pt-1 border-t border-cyan-900/20">
+                        <div className="text-[9px] tracking-widest text-blue-400/40">WAKE WORD « HEY JARVIS »</div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Ear size={14} className={wakeWordEnabled ? "text-cyan-400" : "text-blue-400/40"} />
+                            <span className="text-xs text-cyan-100/70">
+                              {!wakeWordAvailable
+                                ? "Indisponible sur ce serveur"
+                                : wakeWordEnabled
+                                ? "Veille active — dites « Hey Jarvis »"
+                                : "Veille désactivée"}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setWakeWordEnabled(!wakeWordEnabled)}
+                            disabled={!wakeWordAvailable}
+                            className="relative w-10 h-5 rounded-full transition-all disabled:opacity-30"
+                            style={{
+                              background: wakeWordEnabled ? "rgba(0,212,255,0.3)" : "rgba(255,255,255,0.05)",
+                              border: `1px solid ${wakeWordEnabled ? "rgba(0,212,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+                            }}
+                          >
+                            <motion.div
+                              animate={{ x: wakeWordEnabled ? 20 : 2 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                              className="absolute top-0.5 w-4 h-4 rounded-full"
+                              style={{ background: wakeWordEnabled ? "#00d4ff" : "#ffffff22", boxShadow: wakeWordEnabled ? "0 0 8px #00d4ff" : "none" }}
+                            />
+                          </button>
+                        </div>
+                        <p className="text-[8px] text-blue-400/25 leading-relaxed">
+                          L'audio de veille est analysé localement pour le mot-clé uniquement — jamais transcrit ni conservé.
+                        </p>
+                      </div>
+
                       {/* Mic info */}
                       <div className="flex flex-col gap-2 pt-1 border-t border-cyan-900/20">
                         <div className="text-[9px] tracking-widest text-blue-400/40">MICROPHONE</div>
@@ -257,6 +298,9 @@ export function SettingsPanel() {
                       </div>
                     </>
                   )}
+
+                  {/* ── BRAIN TAB ── */}
+                  {activeTab === "brain" && <ProvidersTab />}
 
                   {/* ── SERVICES TAB ── */}
                   {activeTab === "services" && (

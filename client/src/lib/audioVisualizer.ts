@@ -1,13 +1,14 @@
 export interface VisualizerOptions {
   canvas: HTMLCanvasElement;
   analyser: AnalyserNode;
-  status: "idle" | "listening" | "processing" | "speaking" | "error";
+  status: "idle" | "standby" | "listening" | "processing" | "speaking" | "error";
   time: number;
   ttsAnalyser?: AnalyserNode | null;
 }
 
 const STATUS_COLORS: Record<string, [string, string]> = {
   idle:       ["#00d4ff", "#0088aa"],
+  standby:    ["#3388cc", "#225577"],
   listening:  ["#00ff88", "#00aa55"],
   processing: ["#ffaa00", "#ff6600"],
   speaking:   ["#00d4ff", "#8800ff"],

@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import type { JarvisStatus, Message, ServerEvent } from "../types";
+import type { AgentStep, JarvisStatus, Message, ServerEvent } from "../types";
 
 const MAX_MESSAGES = 200;
+const MAX_AGENT_STEPS = 30;
 
 // Singleton AudioContext — one per app session
 let _audioCtx: AudioContext | null = null;
@@ -151,6 +152,13 @@ interface JarvisState {
   wsSend: ((event: object) => void) | null;
   sttAvailable: boolean;
   llmAvailable: boolean;
+  providerLabel: string;
+  providerModel: string;
+  agentSteps: AgentStep[];
+  bootDone: boolean;
+  wakeWordEnabled: boolean;
+  wakeWordAvailable: boolean;
+  wakeDetected: boolean;
 
   setStatus: (status: JarvisStatus) => void;
   setConnected: (v: boolean) => void;
@@ -160,6 +168,9 @@ interface JarvisState {
   setTtsEnabled: (v: boolean) => void;
   setSelectedVoice: (v: string) => void;
   setWsSend: (fn: (event: object) => void) => void;
+  setBootDone: (v: boolean) => void;
+  setWakeWordEnabled: (v: boolean) => void;
+  consumeWakeDetected: () => void;
   clearMessages: () => void;
   exportConversation: () => void;
   handleServerEvent: (event: ServerEvent) => void;
@@ -176,8 +187,21 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   wsSend: null,
   sttAvailable: false,
   llmAvailable: false,
+  providerLabel: "Local (Mistral GGUF)",
+  providerModel: "",
+  agentSteps: [],
+  bootDone: false,
+  wakeWordEnabled: localStorage.getItem("jarvis_wake_word") === "1",
+  wakeWordAvailable: true,
+  wakeDetected: false,
 
   setStatus: (status) => set({ status }),
+  setBootDone: (bootDone) => set({ bootDone }),
+  setWakeWordEnabled: (wakeWordEnabled) => {
+    localStorage.setItem("jarvis_wake_word", wakeWordEnabled ? "1" : "0");
+    set({ wakeWordEnabled });
+  },
+  consumeWakeDetected: () => set({ wakeDetected: false }),
   setConnected: (isConnected) => {
     if (!isConnected) clearTtsQueue();
     set({ isConnected });
@@ -241,6 +265,8 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
 
     switch (event.type) {
       case "status":
+        // Nouvelle requête → efface la timeline de raisonnement précédente
+        if (event.payload.status === "processing") set({ agentSteps: [] });
         setStatus(event.payload.status);
         break;
 
@@ -316,10 +342,54 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
         // Les tool_results sont gérés silencieusement (le LLM en parle dans sa réponse)
         break;
 
+      case "agent_step": {
+        const { phase, detail } = event.payload;
+        if (phase === "done") {
+          // Conserver la timeline jusqu'à la prochaine requête
+          break;
+        }
+        set((s) => ({
+          agentSteps: [
+            ...s.agentSteps.slice(-MAX_AGENT_STEPS + 1),
+            { phase, detail, timestamp: Date.now() },
+          ],
+        }));
+        break;
+      }
+
+      case "wake":
+        set({ wakeDetected: true });
+        break;
+
+      case "wake_unavailable":
+        set({ wakeWordAvailable: false, wakeWordEnabled: false });
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "system",
+          content: "⚠ Wake word indisponible — openwakeword non installé côté serveur.",
+          timestamp: Date.now(),
+        });
+        break;
+
+      case "notice":
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "system",
+          content: `ℹ ${event.payload.message}`,
+          timestamp: Date.now(),
+        });
+        break;
+
       case "server_status":
         set({
           sttAvailable: event.payload.stt,
           llmAvailable: event.payload.llm,
+          ...(event.payload.providerLabel
+            ? { providerLabel: event.payload.providerLabel }
+            : {}),
+          ...(event.payload.providerModel
+            ? { providerModel: event.payload.providerModel }
+            : {}),
         });
         break;
 

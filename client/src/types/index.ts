@@ -1,5 +1,6 @@
 export type JarvisStatus =
   | "idle"
+  | "standby"
   | "listening"
   | "processing"
   | "speaking"
@@ -19,6 +20,34 @@ export interface AudioChunk {
   sampleRate: number;
 }
 
+export type AgentPhase = "thinking" | "tool" | "verify" | "done";
+
+export interface AgentStep {
+  phase: AgentPhase;
+  detail: string;
+  timestamp: number;
+}
+
+export interface ProviderInfo {
+  name: string;
+  label: string;
+  kind: "anthropic" | "openai";
+  needs_key: boolean;
+  base_url: string;
+  model: string;
+  api_key_masked: string;
+  configured: boolean;
+}
+
+export interface ProvidersStatus {
+  active: string;
+  active_label: string;
+  active_model: string;
+  tier: "local" | "cloud";
+  local_available: boolean;
+  providers: ProviderInfo[];
+}
+
 export type ServerEvent =
   | { type: "status"; payload: { status: JarvisStatus } }
   | { type: "token"; payload: { token: string; messageId: string } }
@@ -27,13 +56,29 @@ export type ServerEvent =
   | { type: "tts_chunk"; payload: { audio: string; final: boolean; index: number } }
   | { type: "stt_text"; payload: { text: string } }
   | { type: "tool_result"; payload: { tool: string; result: string } }
+  | { type: "agent_step"; payload: { phase: AgentPhase; detail: string; messageId: string } }
+  | { type: "wake"; payload: Record<string, never> }
+  | { type: "wake_unavailable"; payload: Record<string, never> }
+  | { type: "notice"; payload: { message: string } }
   | { type: "error"; payload: { message: string } }
-  | { type: "server_status"; payload: { llm: boolean; stt: boolean; tts: boolean } }
+  | {
+      type: "server_status";
+      payload: {
+        llm: boolean;
+        stt: boolean;
+        tts: boolean;
+        provider?: string;
+        providerLabel?: string;
+        providerModel?: string;
+      };
+    }
   | { type: "system_alert"; payload: { alert_type: string; message: string } };
 
 export type ClientEvent =
   | { type: "text_query"; payload: { text: string } }
   | { type: "audio_chunk"; payload: AudioChunk }
+  | { type: "wake_audio"; payload: AudioChunk }
+  | { type: "wake_reset"; payload: Record<string, never> }
   | { type: "mic_stop"; payload: Record<string, never> }
   | { type: "tts_done"; payload: Record<string, never> }
   | { type: "set_tts"; payload: { enabled: boolean } }

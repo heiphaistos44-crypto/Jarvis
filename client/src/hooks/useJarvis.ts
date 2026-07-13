@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useWebSocket } from "./useWebSocket";
 import { useAudioCapture } from "./useAudioCapture";
+import { useWakeWord } from "./useWakeWord";
 import { useJarvisStore } from "../stores/jarvisStore";
 
 export function useJarvis() {
@@ -8,6 +9,18 @@ export function useJarvis() {
   const isMicActive = useJarvisStore((s) => s.isMicActive);
   const status = useJarvisStore((s) => s.status);
   const { startCapture, stopCapture } = useAudioCapture(send);
+
+  const activateMic = useCallback(async () => {
+    try {
+      await startCapture();
+      useJarvisStore.getState().setMicActive(true);
+    } catch {
+      useJarvisStore.getState().setMicActive(false);
+    }
+  }, [startCapture]);
+
+  // Mode veille « Hey Jarvis » → active le micro à la détection
+  useWakeWord(send, activateMic);
 
   const sendText = useCallback(
     (text: string) => {
@@ -22,15 +35,9 @@ export function useJarvis() {
       stopCapture();
       useJarvisStore.getState().setMicActive(false);
     } else {
-      try {
-        await startCapture();
-        useJarvisStore.getState().setMicActive(true);
-      } catch {
-        // Error already set in store by useAudioCapture
-        useJarvisStore.getState().setMicActive(false);
-      }
+      await activateMic();
     }
-  }, [isMicActive, startCapture, stopCapture]);
+  }, [isMicActive, activateMic, stopCapture]);
 
   return { sendText, toggleMic, isMicActive, status };
 }
