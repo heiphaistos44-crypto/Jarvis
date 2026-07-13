@@ -11,13 +11,11 @@ interface VoiceOption {
   description: string;
 }
 
+// Voix masculines uniquement — l'identité vocale JARVIS
 const VOICE_OPTIONS: VoiceOption[] = [
   { id: "edge:fr-FR-HenriNeural", label: "Henri — Neural", description: "Voix masculine profonde et naturelle, esprit JARVIS (en ligne, secours local auto)" },
   { id: "edge:fr-FR-RemyMultilingualNeural", label: "Rémy — Neural", description: "Voix masculine jeune et fluide (en ligne, secours local auto)" },
-  { id: "edge:fr-FR-DeniseNeural", label: "Denise — Neural", description: "Voix féminine naturelle (en ligne, secours local auto)" },
   { id: "fr_FR-upmc-medium",  label: "UPMC — Local",  description: "Voix masculine française 100 % hors-ligne" },
-  { id: "fr_FR-mls-medium",   label: "MLS — Local",   description: "Voix multi-locuteurs 100 % hors-ligne" },
-  { id: "fr_FR-siwis-medium", label: "SIWIS — Local",  description: "Voix féminine claire 100 % hors-ligne" },
 ];
 
 type GmailStatus = "loading" | "non_configured" | "not_authenticated" | "connected";

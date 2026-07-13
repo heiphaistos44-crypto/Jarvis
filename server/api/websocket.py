@@ -393,6 +393,51 @@ async def handle_text_query(
     await manager.send(ws, "status", {"status": "idle"})
 
 
+async def handle_council_query(
+    ws: WebSocket,
+    text: str,
+    providers: ProviderManager,
+    memory: ContextMemory,
+    tts: TTSManager,
+    tts_enabled: bool = True,
+) -> None:
+    """Mode Conseil : toutes les IA disponibles répondent en parallèle, la plus
+    capable arbitre et synthétise la meilleure réponse."""
+    await manager.send(ws, "status", {"status": "processing"})
+    memory.add_user(text)
+    message_id = str(uuid.uuid4())
+
+    async def _on_step(phase: str, detail: str) -> None:
+        await manager.send(ws, "agent_step", {
+            "phase": phase, "detail": detail, "messageId": message_id,
+        })
+
+    from core.council import run_council
+    best, participants, judge_label = await run_council(text, providers, _on_step)
+
+    if participants:
+        await manager.send(ws, "notice", {
+            "message": f"Conseil : {', '.join(participants)} — arbitré par {judge_label}",
+        })
+
+    await manager.send(ws, "token", {"token": best, "messageId": message_id})
+    memory.add_assistant(best)
+
+    if tts_enabled and tts.is_available and best:
+        tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        tts_task = asyncio.create_task(_tts_sentence_worker(tts_queue, ws, tts))
+        try:
+            for sentence in tts.split_sentences(best):
+                await tts_queue.put(sentence)
+        finally:
+            await tts_queue.put(None)
+            await tts_task
+
+    await manager.send(ws, "agent_step", {"phase": "done", "detail": "", "messageId": message_id})
+    await manager.send(ws, "message_done", {"messageId": message_id})
+    await manager.send(ws, "status", {"status": "idle"})
+
+
 async def transcribe_and_query(
     ws: WebSocket,
     audio_buffer: list[list[float]],
@@ -484,7 +529,11 @@ async def websocket_handler(
                 if not text:
                     continue
                 text = text[:MAX_TEXT_CHARS]
-                await handle_text_query(ws, text, providers, memory, tts, tools, tts_enabled)
+                council = bool(payload.get("council", False))
+                if council and len(providers.council_members()) >= 2:
+                    await handle_council_query(ws, text, providers, memory, tts, tts_enabled)
+                else:
+                    await handle_text_query(ws, text, providers, memory, tts, tools, tts_enabled)
 
             elif event_type == "audio_chunk":
                 if not _rate_limiter.allow_audio(ws_id):

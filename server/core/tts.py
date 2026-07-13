@@ -50,7 +50,13 @@ class TTSManager:
     def set_edge_voice(self, voice_name: str) -> None:
         """Active une voix neurale Edge-TTS (ex. fr-FR-HenriNeural)."""
         self._edge_voice = voice_name
-        logger.info(f"Voix TTS changée: {voice_name} (Edge, Piper en secours)")
+        # Le secours Piper doit rester cohérent avec la voix Edge (masculine) —
+        # jamais de bascule vers une voix féminine choisie précédemment.
+        default_male = self._piper_exe.parent / "fr_FR-upmc-medium.onnx"
+        if default_male.exists():
+            self._voice = default_male
+            self._piper_ok = self._piper_exe.exists()
+        logger.info(f"Voix TTS changée: {voice_name} (Edge, secours Piper {self._voice.stem})")
 
     async def _synthesize_edge(self, text: str) -> str:
         import edge_tts  # type: ignore[import]

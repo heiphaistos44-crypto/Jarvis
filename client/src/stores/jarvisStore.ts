@@ -67,6 +67,19 @@ function buildJarvisChain(ctx: AudioContext): AudioNode {
   return hp; // chain entry point
 }
 
+const MALE_VOICES = new Set([
+  "edge:fr-FR-HenriNeural",
+  "edge:fr-FR-RemyMultilingualNeural",
+  "fr_FR-upmc-medium",
+]);
+
+function _initialVoice(): string {
+  // Migration : tout choix antérieur non masculin (SIWIS, MLS, Denise…)
+  // revient à Henri — l'identité vocale JARVIS est masculine.
+  const stored = localStorage.getItem("jarvis_voice");
+  return stored && MALE_VOICES.has(stored) ? stored : "edge:fr-FR-HenriNeural";
+}
+
 function ttsPlaybackRate(): number {
   // +4 % de pitch : uniquement pour Piper (rend le synthétique plus net).
   // Les voix neurales Edge sont naturelles — ne pas les dénaturer.
@@ -172,6 +185,8 @@ interface JarvisState {
   wakeWordEnabled: boolean;
   wakeWordAvailable: boolean;
   wakeDetected: boolean;
+  councilEnabled: boolean;
+  setCouncilEnabled: (v: boolean) => void;
 
   setStatus: (status: JarvisStatus) => void;
   setConnected: (v: boolean) => void;
@@ -196,7 +211,7 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   pendingMessageId: null,
   isMicActive: false,
   ttsEnabled: true,
-  selectedVoice: localStorage.getItem("jarvis_voice") || "edge:fr-FR-HenriNeural",
+  selectedVoice: _initialVoice(),
   wsSend: null,
   sttAvailable: false,
   llmAvailable: false,
@@ -207,6 +222,7 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   wakeWordEnabled: localStorage.getItem("jarvis_wake_word") === "1",
   wakeWordAvailable: true,
   wakeDetected: false,
+  councilEnabled: localStorage.getItem("jarvis_council") === "1",
 
   setStatus: (status) => set({ status }),
   setBootDone: (bootDone) => set({ bootDone }),
@@ -215,6 +231,10 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
     set({ wakeWordEnabled });
   },
   consumeWakeDetected: () => set({ wakeDetected: false }),
+  setCouncilEnabled: (councilEnabled) => {
+    localStorage.setItem("jarvis_council", councilEnabled ? "1" : "0");
+    set({ councilEnabled });
+  },
   setConnected: (isConnected) => {
     if (!isConnected) clearTtsQueue();
     set({ isConnected });

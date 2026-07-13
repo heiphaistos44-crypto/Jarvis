@@ -75,7 +75,7 @@ export type ServerEvent =
   | { type: "system_alert"; payload: { alert_type: string; message: string } };
 
 export type ClientEvent =
-  | { type: "text_query"; payload: { text: string } }
+  | { type: "text_query"; payload: { text: string; council?: boolean } }
   | { type: "audio_chunk"; payload: AudioChunk }
   | { type: "wake_audio"; payload: AudioChunk }
   | { type: "wake_reset"; payload: Record<string, never> }

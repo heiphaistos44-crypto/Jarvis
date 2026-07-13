@@ -37,9 +37,17 @@ PRESETS: dict[str, dict] = {
                    "base_url": "https://api.mistral.ai/v1", "model": "mistral-small-latest", "needs_key": True},
     "lmstudio":   {"kind": "openai", "label": "LM Studio (local)",
                    "base_url": "http://localhost:1234/v1", "model": "", "needs_key": False},
+    "pollinations": {"kind": "openai", "label": "Pollinations (gratuit, sans clé)",
+                     "base_url": "https://text.pollinations.ai/openai", "model": "openai", "needs_key": False},
     "custom":     {"kind": "openai", "label": "API personnalisée",
                    "base_url": "", "model": "", "needs_key": False},
 }
+
+# Ordre de préférence pour juger le conseil multi-IA (du plus capable au moins)
+_JUDGE_ORDER = [
+    "anthropic", "openai", "gemini", "groq", "deepseek", "xai",
+    "mistral", "openrouter", "pollinations", "lmstudio", "ollama", "custom",
+]
 
 _CONFIG_FIELDS = {"api_key", "model", "base_url"}
 
@@ -152,6 +160,25 @@ class ProviderManager:
         self._save_config()
         logger.info(f"Provider actif: {name} ({provider.model})")
         return ""
+
+    def council_members(self) -> list[LLMProvider]:
+        """Tous les cerveaux interrogeables : local + chaque provider configuré."""
+        members: list[LLMProvider] = []
+        if self._local.is_available:
+            members.append(self._local)
+        for name in PRESETS:
+            provider = self._build(name)
+            if provider is not None and provider.is_available:
+                members.append(provider)
+        return members
+
+    def judge_provider(self) -> LLMProvider:
+        """Le cerveau le plus capable disponible — arbitre du conseil."""
+        for name in _JUDGE_ORDER:
+            provider = self._build(name)
+            if provider is not None and provider.is_available:
+                return provider
+        return self._local
 
     def status(self) -> dict:
         """État complet pour l'UI — les clés API sont masquées."""

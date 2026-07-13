@@ -25,7 +25,10 @@ export function useJarvis() {
   const sendText = useCallback(
     (text: string) => {
       if (!text.trim()) return;
-      send({ type: "text_query", payload: { text } });
+      send({
+        type: "text_query",
+        payload: { text, council: useJarvisStore.getState().councilEnabled },
+      });
     },
     [send]
   );

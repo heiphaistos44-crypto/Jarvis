@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Mic, MicOff, Send, Zap, CheckCircle } from "lucide-react";
+import { Mic, MicOff, Send, Zap, CheckCircle, Network } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useJarvis } from "../../hooks/useJarvis";
 import { useJarvisStore } from "../../stores/jarvisStore";
@@ -12,6 +12,8 @@ export function CommandInput() {
   const status = useJarvisStore((s) => s.status);
   const isConnected = useJarvisStore((s) => s.isConnected);
   const addMessage = useJarvisStore((s) => s.addMessage);
+  const councilEnabled = useJarvisStore((s) => s.councilEnabled);
+  const setCouncilEnabled = useJarvisStore((s) => s.setCouncilEnabled);
   const isDisabled = !isConnected || status === "processing" || status === "speaking";
 
   const handleSubmit = useCallback(() => {
@@ -95,6 +97,32 @@ export function CommandInput() {
           autoFocus
         />
 
+        {/* Council toggle — toutes les IA répondent, la meilleure est arbitrée */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setCouncilEnabled(!councilEnabled)}
+          className="p-2 rounded transition-all relative"
+          style={{
+            color: councilEnabled ? "#c084fc" : "#00d4ff44",
+            background: councilEnabled ? "#c084fc11" : "transparent",
+            border: `1px solid ${councilEnabled ? "#c084fc44" : "transparent"}`,
+          }}
+          title={councilEnabled
+            ? "Mode Conseil actif — toutes les IA répondent, la meilleure réponse est arbitrée"
+            : "Activer le mode Conseil multi-IA"}
+        >
+          {councilEnabled && (
+            <motion.div
+              className="absolute inset-0 rounded"
+              style={{ background: "#c084fc0d", border: "1px solid #c084fc33" }}
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 1.6, repeat: Infinity }}
+            />
+          )}
+          <Network size={16} />
+        </motion.button>
+
         {/* Mic button */}
         <motion.button
           whileHover={{ scale: 1.1 }}
@@ -160,6 +188,13 @@ export function CommandInput() {
         <span className="text-[9px] text-blue-400/20 tracking-widest">ENTRÉE pour envoyer</span>
         <span className="text-[9px] text-blue-400/15">·</span>
         <span className="text-[9px] text-blue-400/20 tracking-widest">MIC pour parler</span>
+        <span className="text-[9px] text-blue-400/15">·</span>
+        <span
+          className="text-[9px] tracking-widest"
+          style={{ color: councilEnabled ? "#c084fc99" : "#3b82f633" }}
+        >
+          {councilEnabled ? "CONSEIL MULTI-IA ACTIF" : "⬡ pour le conseil multi-IA"}
+        </span>
       </div>
     </div>
   );
