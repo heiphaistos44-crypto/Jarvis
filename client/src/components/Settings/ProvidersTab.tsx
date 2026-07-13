@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle, Cpu, KeyRound, Loader2 } from "lucide-react";
+import { useJarvisStore } from "../../stores/jarvisStore";
 import type { ProviderInfo, ProvidersStatus } from "../../types";
 
 const API = "http://127.0.0.1:8765/api/providers";
@@ -54,9 +55,17 @@ export function ProvidersTab() {
       if (!res.ok) {
         setError(String(data.detail ?? "Erreur de configuration"));
       } else {
-        setStatus(data as ProvidersStatus);
+        const next = data as ProvidersStatus;
+        setStatus(next);
         setApiKey("");
-        if (activate) setSelected(null);
+        if (activate) {
+          setSelected(null);
+          // Mise à jour immédiate du HUD (label CERVEAU) sans attendre le WS
+          useJarvisStore.setState({
+            providerLabel: next.active_label,
+            providerModel: next.active_model,
+          });
+        }
       }
     } catch {
       setError("Serveur injoignable");

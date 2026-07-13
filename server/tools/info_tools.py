@@ -10,6 +10,21 @@ from utils.logger import get_logger
 
 logger = get_logger("info_tools")
 
+_DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+_MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet",
+           "août", "septembre", "octobre", "novembre", "décembre"]
+
+
+@tool
+def get_datetime() -> str:
+    """Date et heure locales actuelles, formatées en français."""
+    from datetime import datetime
+    now = datetime.now()
+    return (
+        f"Nous sommes le {_DAYS[now.weekday()]} {now.day} {_MONTHS[now.month - 1]} "
+        f"{now.year}, il est {now.hour:02d}h{now.minute:02d}."
+    )
+
 # WMO weather condition codes
 _WMO: dict[int, str] = {
     0: "Ciel dégagé ☀️", 1: "Principalement dégagé 🌤️", 2: "Partiellement nuageux ⛅",

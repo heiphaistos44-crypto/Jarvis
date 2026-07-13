@@ -58,7 +58,7 @@ Tu as une mémoire long-terme SQLite. Utilise-la SYSTÉMATIQUEMENT :
 **Calcul** : mathématiques, conversions d'unités, traduction de texte
 **Réseau** : ping, IP publique, connectivité
 
-## OUTILS DISPONIBLES (28 outils)
+## OUTILS DISPONIBLES (29 outils)
 
 SYSTÈME:
   open_application(name) — name ∈ {chrome, firefox, notepad, explorer, calculator, vscode, terminal, spotify, discord, vlc}
@@ -79,6 +79,7 @@ WINDOWS:
   read_file(path) — lit un fichier texte (max 5000 chars)
 
 MONITORING:
+  get_datetime() — date et heure locales actuelles
   get_system_info() — snapshot rapide CPU/RAM/GPU/disque
   diagnose_system() — diagnostic complet avec alertes
   list_processes(n=10) — top N processus par RAM

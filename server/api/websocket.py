@@ -46,6 +46,7 @@ async def _agent_loop(
     message_id: str,
     tts_queue: "asyncio.Queue[str]",
     system: str,
+    preexecuted: tuple[str, dict, str] | None = None,
 ) -> str:
     """Boucle agent : LLM → tool → LLM → ... → réponse finale (max 5 itérations)."""
     accumulated = ""
@@ -60,6 +61,27 @@ async def _agent_loop(
         await manager.send(ws, "notice", {
             "message": f"{label} indisponible — bascule sur le cerveau local.",
         })
+
+    # Fast-path : outil déjà exécuté par le routeur d'intention — le LLM ne
+    # fait que formuler la réponse à partir du résultat.
+    if preexecuted is not None:
+        name, args, result = preexecuted
+        used_tools = True
+        await manager.send(ws, "agent_step", {
+            "phase": "tool", "detail": name, "messageId": message_id,
+        })
+        await manager.send(ws, "tool_result", {"tool": name, "result": str(result)[:300]})
+        messages = messages + [
+            {
+                "role": "user",
+                "content": (
+                    f"[RÉSULTAT OUTIL {name}({args})]\n{result}\n\n"
+                    "Réponds directement à Monsieur en français, en une ou deux "
+                    "phrases, à partir de ce résultat. N'émets PAS de balise "
+                    "JARVIS_TOOL — le résultat est déjà là."
+                ),
+            },
+        ]
 
     tag_open = "<JARVIS_TOOL>"
 
@@ -312,6 +334,20 @@ async def handle_text_query(
     message_id = str(uuid.uuid4())
     system = build_system_prompt(providers.tier, text)
 
+    # Routeur d'intention : les demandes évidentes exécutent l'outil
+    # immédiatement, sans dépendre du LLM pour le déclencher.
+    preexecuted: tuple[str, dict, str] | None = None
+    from core.intent import fast_route
+    route = fast_route(text)
+    if route is not None:
+        name, args = route
+        logger.info(f"Fast-path intent: {name}({args})")
+        try:
+            result = await asyncio.to_thread(tools.execute, name, **args)
+            preexecuted = (name, args, str(result))
+        except Exception as e:
+            logger.warning(f"Fast-path {name} en échec ({e}) — retour boucle agent")
+
     # ── Agent loop (multi-tool, max MAX_AGENT_ITERATIONS) ──────────────────
     tts_queue: asyncio.Queue[str | None] = asyncio.Queue()
     tts_task = None
@@ -329,6 +365,7 @@ async def handle_text_query(
             message_id=message_id,
             tts_queue=tts_queue,
             system=system,
+            preexecuted=preexecuted,
         )
     finally:
         if tts_task:
