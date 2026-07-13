@@ -35,11 +35,14 @@ _NVIDIA_HIGH = HardwareProfile(
 _NVIDIA_MEDIUM = HardwareProfile(
     name="nvidia_medium",
     device="cuda", vram_mb=0,
-    n_gpu_layers=28,             # couches Mistral-7B Q4_K_M ≈ 4.4 GB VRAM
+    # Offload complet : 5 couches CPU limitaient prompt eval à ~35 t/s (48 s
+    # de premier token) et la génération à ~4 t/s. Mistral-7B Q4 + KV 8192
+    # ≈ 6 GB — tient sur 8 GB (retry auto à 28 couches si OOM au chargement).
+    n_gpu_layers=-1,
     n_threads=8,
     whisper_model="small",
     whisper_compute="float16",
-    llm_max_vram_mb=4_800,
+    llm_max_vram_mb=6_500,
 )
 
 _NVIDIA_LOW = HardwareProfile(

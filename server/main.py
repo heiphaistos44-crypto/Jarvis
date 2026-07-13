@@ -58,6 +58,12 @@ async def _load_models_background() -> None:
     await asyncio.to_thread(llm.load)
     logger.info("Chargement STT Whisper...")
     await asyncio.to_thread(stt.load)
+    # Warmup : pré-évalue le prompt système stable (le même que celui servi aux
+    # connexions locales) — la première question de Monsieur démarre en ~2 s
+    # au lieu de ~45 s.
+    if providers.tier == "local":
+        from core.prompt import build_system_prompt
+        await llm.warmup(build_system_prompt("local", "", stable=True))
     logger.info(f"JARVIS prêt — LLM: {llm.is_available} | STT: {stt.is_available} | TTS: {tts.is_available}")
     # Notifier tous les clients WebSocket connectés que les modèles sont prêts
     from core.monitor import broadcast_direct as _broadcast_direct

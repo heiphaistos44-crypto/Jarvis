@@ -1,3 +1,7 @@
+# AI — LLM local (roue CUDA obligatoire, la roue PyPI par défaut est CPU-only !)
+# pip install llama-cpp-python==0.3.4 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+llama-cpp-python==0.3.4
+
 # Web framework
 fastapi==0.136.3
 uvicorn[standard]==0.48.0

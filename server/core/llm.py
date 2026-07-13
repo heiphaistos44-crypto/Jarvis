@@ -168,29 +168,46 @@ class LLMManager:
             return
         try:
             from llama_cpp import Llama  # type: ignore[import]
-            self._llm = Llama(
-                model_path=str(model_path),
-                n_ctx=self._settings.n_ctx,
-                n_gpu_layers=self._settings.n_gpu_layers,
-                n_threads=self._settings.n_threads,
-                chat_format="mistral-instruct",
-                verbose=False,
-            )
-            # Cache KV : sans lui, TOUT le prompt (system ~3k tokens + historique)
-            # est ré-évalué à chaque message → plusieurs secondes de latence.
-            # Avec le cache, seuls les nouveaux tokens sont évalués tant que le
-            # préfixe du prompt reste identique.
-            try:
-                from llama_cpp import LlamaRAMCache  # type: ignore[import]
-                self._llm.set_cache(LlamaRAMCache(capacity_bytes=512 * 1024 * 1024))
-                logger.info("Cache KV LlamaRAMCache activé (512 MB)")
-            except Exception as e:
-                logger.warning(f"Cache KV indisponible: {e}")
-            logger.info(f"LLM chargé: {model_path.name}")
         except ImportError:
             logger.warning("llama-cpp-python non installé — LLM désactivé")
+            return
+
+        # Réutilisation de préfixe : llama-cpp-python conserve nativement le
+        # KV du dernier appel et n'évalue que le suffixe qui diffère — à
+        # condition que le début du prompt soit identique d'un tour à l'autre
+        # (d'où le system prompt stable par connexion + warmup au démarrage).
+        # Ne PAS utiliser LlamaRAMCache : il copie l'état complet (~Go) à
+        # chaque appel et fige la génération.
+        for n_layers in (self._settings.n_gpu_layers, 28, 16):
+            try:
+                self._llm = Llama(
+                    model_path=str(model_path),
+                    n_ctx=self._settings.n_ctx,
+                    n_gpu_layers=n_layers,
+                    n_threads=self._settings.n_threads,
+                    chat_format="mistral-instruct",
+                    verbose=False,
+                )
+                logger.info(f"LLM chargé: {model_path.name} (n_gpu_layers={n_layers})")
+                return
+            except Exception as e:
+                logger.error(f"Chargement LLM échoué (n_gpu_layers={n_layers}): {e}")
+                self._llm = None
+        logger.error("LLM indisponible — tous les niveaux d'offload ont échoué")
+
+    async def warmup(self, system: str) -> None:
+        """Pré-évalue le prompt système au démarrage : le coût du premier
+        prompt (~1600 tokens) est payé ici, pas à la première question."""
+        if self._llm is None:
+            return
+        try:
+            async for _ in self.stream(
+                [{"role": "user", "content": "Bonjour"}], max_tokens=1, system=system,
+            ):
+                break
+            logger.info("Warmup LLM terminé — prompt système pré-évalué")
         except Exception as e:
-            logger.error(f"Erreur chargement LLM: {e}")
+            logger.warning(f"Warmup LLM échoué: {e}")
 
     def unload(self) -> None:
         self._llm = None

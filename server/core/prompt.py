@@ -19,8 +19,11 @@ def build_system_prompt(tier: str, user_text: str, stable: bool = False) -> str:
 
     router = get_router()
     if stable:
+        # Prompt stable ET court : seulement les disciplines `always` — un 7B
+        # ne suit pas 6 disciplines, et chaque token de prompt coûte de la
+        # latence au premier message.
         skills_block = "\n\n".join(
-            f"### {s.name}\n{s.body(tier)}" for s in router.skills
+            f"### {s.name}\n{s.body(tier)}" for s in router.skills if s.always
         )
     else:
         skills_block = router.select(user_text, tier)
