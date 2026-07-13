@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tools.decorator import tool
 import subprocess
 from pathlib import Path
 from datetime import datetime
@@ -28,6 +29,7 @@ ALLOWED_KILL_APPS: frozenset[str] = frozenset({
 })
 
 
+@tool
 def open_application(name: str) -> str:
     if not isinstance(name, str) or not name.strip():
         return "Erreur: nom d'application invalide (chaîne non vide requise)."
@@ -45,6 +47,7 @@ def open_application(name: str) -> str:
         return f"Erreur lancement '{name}': {e}"
 
 
+@tool
 def kill_application(name: str) -> str:
     if not isinstance(name, str) or not name.strip():
         return "Erreur: nom d'application invalide."
@@ -65,6 +68,7 @@ def kill_application(name: str) -> str:
     return f"Aucun processus autorisé '{name}' trouvé."
 
 
+@tool
 def take_screenshot() -> str:
     """Capture the primary screen and save to Desktop."""
     try:
@@ -95,6 +99,7 @@ def take_screenshot() -> str:
         return f"Erreur screenshot: {e}"
 
 
+@tool
 def read_clipboard() -> str:
     """Read current clipboard content."""
     try:
@@ -111,6 +116,7 @@ def read_clipboard() -> str:
         return f"Erreur lecture presse-papiers: {e}"
 
 
+@tool
 def write_clipboard(text: str) -> str:
     """Write text to clipboard via stdin (injection-safe)."""
     if not isinstance(text, str):

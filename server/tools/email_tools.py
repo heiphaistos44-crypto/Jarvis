@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tools.decorator import tool
 import base64
 from email.message import EmailMessage
 from pathlib import Path
@@ -66,6 +67,7 @@ def gmail_status() -> str:
     return "connected"
 
 
+@tool
 def list_emails(count: int = 5) -> str:
     try:
         service = _get_service()
@@ -97,6 +99,7 @@ def list_emails(count: int = 5) -> str:
         return f"Erreur Gmail: {e}"
 
 
+@tool
 def send_email(to: str, subject: str, body: str) -> str:
     if not to or "@" not in to:
         return "Erreur: adresse email invalide."

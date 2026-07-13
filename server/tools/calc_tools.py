@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tools.decorator import tool
 import ast
 import math
 import operator
@@ -87,6 +88,7 @@ def _safe_eval_node(node: ast.expr, depth: int = 0) -> float:
     raise ValueError(f"Construction non autorisée: {type(node).__name__}")
 
 
+@tool
 def calculate(expression: str) -> str:
     """
     Évalue une expression mathématique sécurisée via AST (sans eval).
@@ -117,6 +119,7 @@ def calculate(expression: str) -> str:
         return f"Erreur de calcul: {e}"
 
 
+@tool
 def convert_units(value: float, from_unit: str, to_unit: str) -> str:
     """
     Convertit des unités. Supporte: km/mi/m/ft/cm/in, kg/lb/g/oz,
@@ -162,6 +165,7 @@ def convert_units(value: float, from_unit: str, to_unit: str) -> str:
     )
 
 
+@tool
 def translate_text(text: str, target_lang: str = "fr") -> str:
     """
     Traduit du texte via MyMemory API (gratuit, sans clé API).

@@ -1,9 +1,11 @@
 from __future__ import annotations
+from tools.decorator import tool
 from utils.logger import get_logger
 
 logger = get_logger("web_tools")
 
 
+@tool
 def web_search(query: str, max_results: int = 5) -> str:
     """Search the web via DuckDuckGo and return top results as plain text."""
     if not query or not query.strip():

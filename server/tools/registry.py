@@ -1,47 +1,45 @@
 from __future__ import annotations
+import importlib
+import pkgutil
+
+import tools as _tools_pkg
 from utils.logger import get_logger
 
 logger = get_logger("registry")
 
+_SKIP_MODULES = {"registry", "decorator"}
+
 
 class ToolRegistry:
+    """Auto-découvre les fonctions décorées @tool dans les modules de tools/.
+
+    Ajouter un fichier tools/xxx_tools.py avec des fonctions @tool suffit —
+    aucune liste manuelle à maintenir.
+    """
+
     def __init__(self) -> None:
         self._tools: dict[str, object] = {}
-        self._register_all()
+        self._discover()
 
-    def _register_all(self) -> None:
-        from tools.system_tools import (
-            open_application, kill_application,
-            take_screenshot, read_clipboard, write_clipboard,
-        )
-        from tools.file_tools import delete_temp_files, create_file, move_file
-        from tools.info_tools import (
-            get_system_info, diagnose_system, list_processes,
-            get_weather, get_news,
-        )
-        from tools.web_tools import web_search
-        from tools.email_tools import list_emails, send_email
-        from tools.memory_tools import save_memory, recall_memory, list_memories
-        from tools.windows_tools import (
-            get_battery, set_volume, ping_host,
-            get_public_ip, list_directory, read_file,
-        )
-        from tools.calc_tools import calculate, convert_units, translate_text
-
-        for fn in [
-            open_application, kill_application, take_screenshot,
-            read_clipboard, write_clipboard,
-            delete_temp_files, create_file, move_file,
-            get_system_info, diagnose_system, list_processes,
-            get_weather, get_news,
-            web_search,
-            list_emails, send_email,
-            save_memory, recall_memory, list_memories,
-            get_battery, set_volume, ping_host,
-            get_public_ip, list_directory, read_file,
-            calculate, convert_units, translate_text,
-        ]:
-            self._tools[fn.__name__] = fn
+    def _discover(self) -> None:
+        for info in pkgutil.iter_modules(_tools_pkg.__path__):
+            if info.name in _SKIP_MODULES or info.name.startswith("_"):
+                continue
+            try:
+                module = importlib.import_module(f"tools.{info.name}")
+            except Exception as e:
+                logger.error(f"Module tools.{info.name} inchargeable: {e}")
+                continue
+            for attr_name in dir(module):
+                if attr_name.startswith("_"):
+                    continue
+                fn = getattr(module, attr_name)
+                if callable(fn) and getattr(fn, "_jarvis_tool", False):
+                    if fn.__name__ in self._tools and self._tools[fn.__name__] is not fn:
+                        logger.warning(f"Outil en doublon ignoré: {fn.__name__} ({info.name})")
+                        continue
+                    self._tools[fn.__name__] = fn
+        logger.info(f"{len(self._tools)} outils découverts")
 
     def execute(self, name: str, **kwargs) -> str:
         if name not in self._tools:

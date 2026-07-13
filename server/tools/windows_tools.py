@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tools.decorator import tool
 import subprocess
 import json
 import re
@@ -21,6 +22,7 @@ def _run_ps(command: str, timeout: int = 10) -> str:
         return f"Erreur PowerShell: {e}"
 
 
+@tool
 def get_battery() -> str:
     """Retourne le niveau de batterie et l'état de charge."""
     out = _run_ps(
@@ -44,6 +46,7 @@ def get_battery() -> str:
         return out or "Information batterie indisponible."
 
 
+@tool
 def set_volume(level: int) -> str:
     """Règle le volume système entre 0 et 100."""
     level = max(0, min(100, int(level)))
@@ -62,6 +65,7 @@ def set_volume(level: int) -> str:
     return f"Volume réglé à {level}% (approximatif)."
 
 
+@tool
 def ping_host(host: str) -> str:
     """Ping un hôte et retourne la latence moyenne."""
     if not re.match(r'^[a-zA-Z0-9.\-_]+$', host) or len(host) > 253:
@@ -80,6 +84,7 @@ def ping_host(host: str) -> str:
     return out or f"Ping {host}: pas de réponse."
 
 
+@tool
 def get_public_ip() -> str:
     """Retourne l'adresse IP publique."""
     try:
@@ -90,6 +95,7 @@ def get_public_ip() -> str:
         return f"Impossible de récupérer l'IP publique: {e}"
 
 
+@tool
 def list_directory(path: str = "") -> str:
     """Liste le contenu d'un répertoire (home par défaut)."""
     base = Path.home()
@@ -138,6 +144,7 @@ def _validate_path(raw_path: str, allowed_roots: list[Path]) -> Path:
     raise PermissionError(f"Accès refusé: {raw_path}")
 
 
+@tool
 def read_file(path: str) -> str:
     """Lit le contenu d'un fichier texte (max 5000 caractères)."""
     MAX_CHARS = 5000

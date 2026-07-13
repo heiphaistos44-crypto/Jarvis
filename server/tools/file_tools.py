@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tools.decorator import tool
 import shutil
 import tempfile
 from pathlib import Path
@@ -25,6 +26,7 @@ def _resolve_safe(path_str: str) -> Path | None:
         return None
 
 
+@tool
 def delete_temp_files() -> str:
     count = 0
     errors = 0
@@ -41,6 +43,7 @@ def delete_temp_files() -> str:
     return f"{count} éléments supprimés ({errors} erreurs de permission)."
 
 
+@tool
 def create_file(path: str, content: str = "") -> str:
     safe_path = _resolve_safe(path)
     if safe_path is None:
@@ -52,6 +55,7 @@ def create_file(path: str, content: str = "") -> str:
     return f"Fichier créé: {safe_path}"
 
 
+@tool
 def move_file(src: str, dst: str) -> str:
     src_path = _resolve_safe(src)
     dst_path = _resolve_safe(dst)

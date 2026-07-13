@@ -1,4 +1,5 @@
 from __future__ import annotations
+from tools.decorator import tool
 import re
 import subprocess
 import urllib.parse
@@ -33,6 +34,7 @@ def _main_disk_usage() -> str:
     return "Disque: N/A"
 
 
+@tool
 def get_system_info() -> str:
     cpu = psutil.cpu_percent(interval=0.5)
     mem = psutil.virtual_memory()
@@ -59,6 +61,7 @@ def get_system_info() -> str:
     )
 
 
+@tool
 def diagnose_system() -> str:
     """Comprehensive Windows system diagnostics."""
     lines: list[str] = ["=== Diagnostic JARVIS ==="]
@@ -159,6 +162,7 @@ def diagnose_system() -> str:
     return "\n".join(lines)
 
 
+@tool
 def list_processes(n: int = 10) -> str:
     """List top N processes by memory usage."""
     try:
@@ -188,6 +192,7 @@ def _validate_city(city: str) -> str:
     return urllib.parse.quote(city, safe='')
 
 
+@tool
 def get_weather(city: str) -> str:
     """Get current weather via open-meteo.com (free, no API key)."""
     if not isinstance(city, str) or not city.strip():
@@ -241,6 +246,7 @@ def get_weather(city: str) -> str:
         return f"Erreur météo pour '{city}': {e}"
 
 
+@tool
 def get_news(topic: str = "", max_results: int = 5) -> str:
     """Get latest news via DuckDuckGo."""
     try:

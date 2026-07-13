@@ -383,6 +383,7 @@ async def websocket_handler(
     audio_buffer: list[list[float]] = []
     current_sample_rate: int = 16000
     tts_enabled: bool = True
+    wake_detector = None  # lazy — instancié au 1er wake_audio (modèle stateful par connexion)
 
     try:
         while True:
@@ -425,6 +426,28 @@ async def websocket_handler(
                         )
                         if stt.is_available:
                             await manager.send(ws, "status", {"status": "listening"})
+
+            elif event_type == "wake_audio":
+                # Mode veille : frames analysées pour « Hey Jarvis » uniquement,
+                # jamais bufferisées pour le STT.
+                if not _rate_limiter.allow_audio(ws_id):
+                    continue
+                chunk_data = payload.get("data")
+                if not isinstance(chunk_data, list):
+                    continue
+                if wake_detector is None:
+                    from core.wakeword import WakeWordDetector
+                    wake_detector = WakeWordDetector()
+                    if not wake_detector.is_available:
+                        await manager.send(ws, "wake_unavailable", {})
+                        continue
+                sr = int(payload.get("sampleRate", 16000))
+                if await wake_detector.feed(chunk_data, sr):
+                    await manager.send(ws, "wake", {})
+
+            elif event_type == "wake_reset":
+                if wake_detector is not None:
+                    wake_detector.reset()
 
             elif event_type == "mic_stop":
                 if audio_buffer and stt.is_available:
