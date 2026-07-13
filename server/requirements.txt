@@ -13,6 +13,9 @@ faster-whisper==1.2.1
 # AI — Wake Word
 openwakeword==0.6.0
 
+# AI — TTS voix neurales (en ligne, Piper reste le secours local)
+edge-tts==7.2.8
+
 # System tools
 psutil==7.2.2
 pyautogui==0.9.54

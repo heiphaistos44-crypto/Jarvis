@@ -67,6 +67,12 @@ function buildJarvisChain(ctx: AudioContext): AudioNode {
   return hp; // chain entry point
 }
 
+function ttsPlaybackRate(): number {
+  // +4 % de pitch : uniquement pour Piper (rend le synthétique plus net).
+  // Les voix neurales Edge sont naturelles — ne pas les dénaturer.
+  return useJarvisStore.getState().selectedVoice.startsWith("edge:") ? 1.0 : 1.04;
+}
+
 async function playTtsAudio(b64: string, onDone: () => void) {
   let timeoutId: number | undefined;
   try {
@@ -77,8 +83,7 @@ async function playTtsAudio(b64: string, onDone: () => void) {
     const buffer = await ctx.decodeAudioData(bytes.buffer);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    // Slight speed-up: raises pitch ~4% for a crisper, more synthetic quality
-    source.playbackRate.value = 1.04;
+    source.playbackRate.value = ttsPlaybackRate();
     source.connect(buildJarvisChain(ctx));
 
     timeoutId = window.setTimeout(() => {
@@ -117,7 +122,7 @@ async function _playNextChunk(onAllDone: () => void): Promise<void> {
     const buffer = await ctx.decodeAudioData(bytes.buffer);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
-    source.playbackRate.value = 1.04;
+    source.playbackRate.value = ttsPlaybackRate();
     source.connect(buildJarvisChain(ctx));
 
     let tid: number | undefined;
@@ -191,7 +196,7 @@ export const useJarvisStore = create<JarvisState>((set, get) => ({
   pendingMessageId: null,
   isMicActive: false,
   ttsEnabled: true,
-  selectedVoice: localStorage.getItem("jarvis_voice") || "fr_FR-upmc-medium",
+  selectedVoice: localStorage.getItem("jarvis_voice") || "edge:fr-FR-HenriNeural",
   wsSend: null,
   sttAvailable: false,
   llmAvailable: false,

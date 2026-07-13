@@ -12,9 +12,12 @@ interface VoiceOption {
 }
 
 const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "fr_FR-upmc-medium",  label: "UPMC Medium",  description: "Voix masculine française classique" },
-  { id: "fr_FR-mls-medium",   label: "MLS Medium",   description: "Voix naturelle multi-locuteurs" },
-  { id: "fr_FR-siwis-medium", label: "SIWIS Medium",  description: "Voix féminine claire et nette" },
+  { id: "edge:fr-FR-HenriNeural", label: "Henri — Neural", description: "Voix masculine profonde et naturelle, esprit JARVIS (en ligne, secours local auto)" },
+  { id: "edge:fr-FR-RemyMultilingualNeural", label: "Rémy — Neural", description: "Voix masculine jeune et fluide (en ligne, secours local auto)" },
+  { id: "edge:fr-FR-DeniseNeural", label: "Denise — Neural", description: "Voix féminine naturelle (en ligne, secours local auto)" },
+  { id: "fr_FR-upmc-medium",  label: "UPMC — Local",  description: "Voix masculine française 100 % hors-ligne" },
+  { id: "fr_FR-mls-medium",   label: "MLS — Local",   description: "Voix multi-locuteurs 100 % hors-ligne" },
+  { id: "fr_FR-siwis-medium", label: "SIWIS — Local",  description: "Voix féminine claire 100 % hors-ligne" },
 ];
 
 type GmailStatus = "loading" | "non_configured" | "not_authenticated" | "connected";
@@ -219,7 +222,9 @@ export function SettingsPanel() {
                         <div className="text-[9px] tracking-widest text-blue-400/40">VOIX FRANÇAISE</div>
                         <div className="flex flex-col gap-1.5">
                           {VOICE_OPTIONS.filter((v) =>
-                            availableVoices.length === 0 || availableVoices.includes(v.id)
+                            v.id.startsWith("edge:") ||
+                            availableVoices.length === 0 ||
+                            availableVoices.includes(v.id)
                           ).map((voice) => {
                             const isSelected = selectedVoice === voice.id;
                             return (

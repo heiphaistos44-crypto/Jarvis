@@ -248,7 +248,9 @@ class LLMManager:
                 gen = self._llm.create_chat_completion(  # type: ignore[union-attr]
                     messages=full_messages,
                     max_tokens=max_tokens,
-                    temperature=0.72,
+                    # 0.5 : le français du 7B part en dérive grammaticale
+                    # au-dessus (« Qu'est-ce qui me tenez ? » observé à 0.72)
+                    temperature=0.5,
                     top_p=0.9,
                     repeat_penalty=1.1,
                     stream=True,

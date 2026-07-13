@@ -548,8 +548,14 @@ async def websocket_handler(
 
             elif event_type == "set_voice":
                 voice_id = str(payload.get("voice", "")).strip()
-                if voice_id:
-                    from pathlib import Path
+                if voice_id.startswith("edge:"):
+                    # Voix neurale Edge-TTS — validation stricte du nom
+                    edge_name = voice_id[5:]
+                    if re.fullmatch(r"[a-zA-Z]{2}-[a-zA-Z]{2}-[a-zA-Z0-9]+", edge_name):
+                        tts.set_edge_voice(edge_name)
+                    else:
+                        logger.warning(f"Nom de voix Edge invalide: {edge_name!r}")
+                elif voice_id:
                     voice_path = MODELS_DIR / "piper" / f"{voice_id}.onnx"
                     if voice_path.exists():
                         tts.set_voice(voice_path)
